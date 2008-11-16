@@ -1,0 +1,3 @@
+#!/bin/sh
+CWD=$PWD
+zcat /var/log/thttpd*.gz | cat - /var/log/thttpd.log | ./agent -c $CWD/botfile -p -
