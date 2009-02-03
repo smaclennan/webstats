@@ -37,6 +37,7 @@
  * TODO - deal with timezone
  * TODO - downcase the name for matching
  * TODO - file for OS matching
+ * TODO - better defaults for bots
  */
 
 
@@ -125,13 +126,11 @@ int n_unknown;
 #define NONE		-1
 #define WINDOZE		0
 #define UNIX		1
-#define JAVA		2
 #define OTHER		3
 struct name_count groups[] = {
 	{ .name = "Microsoft" },
 	{ .name = "Unix" },
-	{ .name = "Java/Perl" },
-	{ .name = "Other" }
+	{ .name = "Other" },
 };
 #define N_GROUPS (sizeof(groups) / sizeof(struct name_count))
 
@@ -262,6 +261,32 @@ static void init_urllist(void)
 }
 
 
+static void init_bots(char *botfile)
+{
+	FILE *fp = fopen(botfile, "r");
+	if (fp) {
+		char line[1024], *p;
+
+		while (fgets(line, sizeof(line), fp)) {
+			if (*line == '#')
+				continue;
+			p = strchr(line, '\n');
+			if (p)
+				*p = '\0';
+			addbot(line);
+		}
+
+		fclose(fp);
+	} else {
+		int i;
+
+		printf("Using default bots (%d)\n", errno);
+		for (i = 0; i < NBOTS; ++i)
+			addbot(defbots[i]);
+	}
+}
+
+
 int main(int argc, char *argv[])
 {
 	FILE *fp;
@@ -306,26 +331,7 @@ int main(int argc, char *argv[])
 
 	init_urllist();
 
-	fp = fopen(botfile, "r");
-	if (fp) {
-		char line[1024], *p;
-
-		while (fgets(line, sizeof(line), fp)) {
-			if (*line == '#')
-				continue;
-			p = strchr(line, '\n');
-			if (p)
-				*p = '\0';
-			addbot(line);
-		}
-
-		fclose(fp);
-	} else {
-		/* setup some default bots */
-		printf("Using default bots (%d)\n", errno);
-		for (i = 0; i < NBOTS; ++i)
-			addbot(defbots[i]);
-	}
+	init_bots(botfile);
 
 	for (arg = optind; arg < argc; ++arg)
 		if (strcmp(argv[arg], "-") == 0)
@@ -510,9 +516,9 @@ void out_html()
 				"<td class=n>%d<td>%.1f%%"
 				"<td class=n>%d<td>%.1f%%\n",
 				n,
-				os[i].hits, percent_hits(os[i].hits),
-				os[i].files, percent_files(os[i].files),
-				os[i].pages, percent_pages(os[i].pages));
+				os[i].hits, percent_os_hits(os[i].hits),
+				os[i].files, percent_os_files(os[i].files),
+				os[i].pages, percent_os_pages(os[i].pages));
 			if (strcmp(os[i].name, "Unknown") == 0) {
 				need_unknown = 1;
 				fprintf(fp, "<td class=text><a href="
@@ -527,13 +533,13 @@ void out_html()
 		fprintf(fp, "<tr bgcolor=\"#D0D0E0\"><td class=day>%d"
 			"<td class=n>%d<td>%.1f%%",
 			n, groups[cur_group].hits,
-			percent_hits(groups[cur_group].hits));
+			percent_os_hits(groups[cur_group].hits));
 		fprintf(fp, "<td class=n>%d<td>%.1f%%\n",
 			groups[cur_group].files,
-			percent_files(groups[cur_group].files));
+			percent_os_files(groups[cur_group].files));
 		fprintf(fp, "<td class=n>%d<td>%.1f%%\n",
 			groups[cur_group].pages,
-			percent_pages(groups[cur_group].pages));
+			percent_os_pages(groups[cur_group].pages));
 		fprintf(fp, "<td class=text>%s\n", groups[cur_group].name);
 		++cur_group;
 		if (groups[cur_group].name == NULL)
@@ -998,9 +1004,9 @@ again:
 	/* Unix */
 
 	else if (strstr(line, "Java"))
-		add_os(JAVA, "Java", agent);
+		add_os(NONE, "Java/Perl", agent);
 	else if (strstr(line, "libwww-perl"))
-		add_os(JAVA, "Perl", agent);
+		add_os(NONE, "Java/Perl", agent);
 	else if (strstr(line, "WebTV"))
 		add_os(OTHER, "WebTV", agent);
 	else if (strstr(line, "RISC OS"))
