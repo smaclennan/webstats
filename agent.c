@@ -111,7 +111,7 @@ struct name_count {
 };
 
 
-#define MAX_AGENTS	3000
+#define MAX_AGENTS	4000
 struct name_count agents[MAX_AGENTS];
 int n_agents;
 
@@ -132,17 +132,23 @@ struct name_count groups[] = {
 	{ .name = "Unix" },
 	{ .name = "Other" },
 };
-#define N_GROUPS (sizeof(groups) / sizeof(struct name_count))
+int n_groups = (sizeof(groups) / sizeof(struct name_count));
 
 #define OTHER_BROWSER		0
 #define MSIE			1
 #define NETSCAPE		2
 #define BOTS			3
+#define OPERA			4
+#define SAFARI			5
+#define CHROME			6
 struct name_count browsers[] = {
 	{ .name = "Everybody Else(tm)" },
 	{ .name = "Internet Explorer" },
 	{ .name = "Mozilla" },
 	{ .name = "Bots" },
+	{ .name = "Opera" },
+	{ .name = "Safari" },
+	{ .name = "Chrome" },
 };
 #define N_BROWSERS (sizeof(browsers) / sizeof(struct name_count))
 
@@ -493,7 +499,7 @@ void out_html()
 		"<th class=name>OS\n");
 	cur_group = 0;
 	for (i = 0, n = 1; i < n_os; ++i, ++n) {
-		while (cur_group < N_GROUPS &&
+		while (cur_group < n_groups &&
 		       greater(&groups[cur_group], &os[i])) {
 			fprintf(fp, "<tr bgcolor=\"#D0D0E0\"><td class=day>-"
 				"<td class=n>%d<td>%.1f%%",
@@ -529,7 +535,7 @@ void out_html()
 	}
 
 	/* Just in case */
-	while (cur_group < N_GROUPS) {
+	while (cur_group < n_groups) {
 		fprintf(fp, "<tr bgcolor=\"#D0D0E0\"><td class=day>%d"
 			"<td class=n>%d<td>%.1f%%",
 			n, groups[cur_group].hits,
@@ -767,8 +773,9 @@ void add_os(int group, char *name, struct name_count *agent)
 
 	/* Do Windows grouping here */
 	if (strncmp(name, "Windows ", 8) == 0) {
-		if (strcmp(name, "Windows XP") &&
-		    strcmp(name, "Windows Vista"))
+		if (strcmp(name + 8, "XP") &&
+		    strcmp(name + 8, "Vista") &&
+		    strcmp(name + 8, "7"))
 			name = "Windows Other";
 	}
 
@@ -832,12 +839,16 @@ int parse_agent(struct name_count *agent)
 		browser = &browsers[BOTS];
 	/* Must put Opera before MSIE & Netscape */
 	else if (strstr(line, "Opera")) {
-#if 0
+#if 1
 		browser = &browsers[OPERA];
 #else
 		browser = &browsers[OTHER_BROWSER];
 #endif
-	} else if ((p = strstr(line, "MSIE"))) {
+	} else if (strstr(line, "Chrome")) /* must come before safari */
+		browser = &browsers[CHROME];
+	else if (strstr(line, "Safari"))
+		browser = &browsers[SAFARI];
+	else if ((p = strstr(line, "MSIE"))) {
 		for (p += 4; isspace(*p) || *p == '+'; ++p)
 			;
 		switch (*p) {
@@ -922,9 +933,11 @@ again:
 				add_os(WINDOZE, "Windows Other", agent);
 		} else if (strncmp(p, "NT", 2) == 0) {
 			p += 2;
-			if (*p == ' ')
+			while (*p == ' ')
 				++p;
-			if (*p == '6') /* Technically 6.0 */
+			if (strncmp(p, "6.1", 3) == 0)
+				add_os(WINDOZE, "Windows 7", agent);
+			else if (*p == '6')
 				add_os(WINDOZE, "Windows Vista", agent);
 			else if (strncmp(p, "5.1", 3) == 0)
 				add_os(WINDOZE, "Windows XP", agent);
@@ -1003,6 +1016,8 @@ again:
 		add_os(UNIX, "Unix Other", agent);
 	/* Unix */
 
+	else if (strstr(line, "BlackBerry"))
+		add_os(NONE, "BlackBerry", agent);
 	else if (strstr(line, "Java"))
 		add_os(NONE, "Java/Perl", agent);
 	else if (strstr(line, "libwww-perl"))
@@ -1023,7 +1038,7 @@ again:
 		add_os(OTHER, "QNX", agent);
 	else if (strstr(line, "I-Opener"))
 		add_os(OTHER, "QNX", agent);
-	else if (strstr(line, "PlayStation"))
+	else if (strcasestr(line, "PlayStation"))
 		add_os(OTHER, "PlayStation", agent);
 	else if (strstr(line, "Google Desktop"))
 		add_os(OTHER, "Google", agent);
@@ -1096,7 +1111,7 @@ void sort_oses(void)
 
 	switch (compare_type) {
 	case COMPARE_HITS:
-		qsort(groups, N_GROUPS, sizeof(struct name_count),
+		qsort(groups, n_groups, sizeof(struct name_count),
 		      hits_compare);
 		qsort(os, n_os, sizeof(struct name_count),
 		      hits_compare);
@@ -1108,7 +1123,7 @@ void sort_oses(void)
 		      hits_compare);
 		break;
 	case COMPARE_FILES:
-		qsort(groups, N_GROUPS, sizeof(struct name_count),
+		qsort(groups, n_groups, sizeof(struct name_count),
 		      files_compare);
 		qsort(os, n_os, sizeof(struct name_count),
 		      files_compare);
@@ -1120,7 +1135,7 @@ void sort_oses(void)
 		      files_compare);
 		break;
 	case COMPARE_PAGES:
-		qsort(groups, N_GROUPS, sizeof(struct name_count),
+		qsort(groups, n_groups, sizeof(struct name_count),
 		      pages_compare);
 		qsort(os, n_os, sizeof(struct name_count),
 		      pages_compare);
@@ -1137,6 +1152,12 @@ void sort_oses(void)
 	for (i = 0; i < N_BROWSERS; ++i)
 		if (strncmp(browsers[i].name, "Bot", 3) == 0)
 			bot_index = i;
+
+	/* Drop empty groups */
+	while (n_groups > 0 && groups[n_groups - 1].hits == 0) {
+		printf("Dropping %s: empty\n", groups[n_groups - 1].name);
+		--n_groups;
+	}
 }
 
 
