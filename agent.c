@@ -33,7 +33,7 @@
  * Done - make basedir configurable
  * Done - get rid of ignored
  * Done - the crawlers in a file
- * TODO - more dynamic allocation
+ * Done - more dynamic allocation
  * TODO - deal with timezone
  * TODO - downcase the name for matching
  * TODO - file for OS matching
@@ -111,17 +111,20 @@ struct name_count {
 };
 
 
-#define MAX_AGENTS	4000
-struct name_count agents[MAX_AGENTS];
+/* As of 2010 this is about 4100 */
+struct name_count *agents;
 int n_agents;
+int max_agents;
 
-#define MAX_OS 100
-struct name_count os[MAX_OS];
+/* As of 2010 this is about 15 */
+struct name_count *os;
 int n_os;
+int max_os;
 
-#define MAX_UNKNOWN 200
-struct name_count unknowns[MAX_UNKNOWN];
+/* As of 2010 this is about 90 */
+struct name_count *unknowns;
 int n_unknown;
+int max_unknown;
 
 #define NONE		-1
 #define WINDOZE		0
@@ -292,6 +295,15 @@ static void init_bots(char *botfile)
 	}
 }
 
+char *must_strdup(char *str)
+{
+	char *new = strdup(str);
+	if (new)
+		return new;
+
+	printf("Out of memory strdup.\n");
+	exit(1);
+}
 
 int main(int argc, char *argv[])
 {
@@ -686,7 +698,9 @@ void process_file(FILE *fp)
 
 		status = strtol(e, NULL, 10);
 		if (status < 100 || status > 600) {
-			printf("Bad status %d line %d\n", status, nline);
+			if (status) /* Too many status 0s to report */
+				printf("Bad status %d line %d\n",
+				       status, nline);
 			continue;
 		}
 
@@ -758,14 +772,38 @@ void add_agent(char *agent, int file, int page)
 			return;
 		}
 
-	agents[n_agents].name  = strdup(agent);
+	if (n_agents == max_agents) {
+		max_agents += 100;
+		agents = realloc(agents,
+				 max_agents * sizeof(struct name_count));
+		if (!agents) {
+			printf("Out of memory. %d agents\n", n_agents);
+			exit(1);
+		}
+	}
+
+	agents[n_agents].name  = must_strdup(agent);
 	agents[n_agents].hits  = 1;
 	agents[n_agents].files = file;
 	agents[n_agents].pages = page;
 	++n_agents;
-	assert(n_agents < MAX_AGENTS);
 }
 
+void add_unknown(struct name_count *agent)
+{
+	if (n_unknown == max_unknown) {
+		max_unknown += 50;
+		unknowns = realloc(unknowns,
+				   max_unknown * sizeof(struct name_count));
+		if (!unknowns) {
+			printf("Out of memory. Unknowns %d\n", n_unknown);
+			exit(1);
+		}
+	}
+
+	memcpy(&unknowns[n_unknown], agent, sizeof(struct name_count));
+	++n_unknown;
+}
 
 void add_os(int group, char *name, struct name_count *agent)
 {
@@ -797,13 +835,22 @@ void add_os(int group, char *name, struct name_count *agent)
 			return;
 		}
 
-	os[n_os].name  = strdup(name);
+	if (n_os == max_os) {
+		max_os += 20;
+		os = realloc(os,
+			     max_os * sizeof(struct name_count));
+		if (!os) {
+			printf("Out of memory. oses = %d\n", n_os);
+			exit(1);
+		}
+	}
+
+	os[n_os].name  = must_strdup(name);
 	os[n_os].hits  = agent->hits;
 	os[n_os].files = agent->files;
 	os[n_os].pages = agent->pages;
 	os[n_os].group = group;
 	++n_os;
-	assert(n_os < MAX_OS);
 }
 
 int isabot(char *line)
@@ -1058,12 +1105,7 @@ again:
 		add_os(WINDOZE, "Windows Other", agent); /* other */
 	else {
 		add_os(NONE, "Unknown", agent);
-		if (n_unknown >= MAX_UNKNOWN)
-			printf("Too many unknowns!!!\n");
-		else
-			memcpy(&unknowns[n_unknown], agent,
-			       sizeof(struct name_count));
-		++n_unknown;
+		add_unknown(agent);
 		return 0;
 	}
 
@@ -1238,7 +1280,7 @@ void addbot(char *bot)
 			exit(1);
 		}
 	}
-	bots[nbots] = strdup(bot);
+	bots[nbots] = must_strdup(bot);
 	if (!bots[nbots]) {
 		printf("Out of memory\n");
 		exit(1);
