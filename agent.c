@@ -107,7 +107,6 @@ struct name_count {
 	int files;
 	int pages;
 	int group;
-	int unknown;
 };
 
 
@@ -365,8 +364,7 @@ int main(int argc, char *argv[])
 		}
 
 	for (i = 0; i < n_agents; ++i)
-		if (!parse_agent(&agents[i]))
-			agents[i].unknown = 1;
+		parse_agent(&agents[i]);
 
 	sort_oses();
 
