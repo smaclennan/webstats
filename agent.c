@@ -128,11 +128,10 @@ int max_unknown;
 #define NONE		-1
 #define WINDOZE		0
 #define UNIX		1
-#define OTHER		3
+#define OTHER		-1
 struct name_count groups[] = {
 	{ .name = "Microsoft" },
 	{ .name = "Unix" },
-	{ .name = "Other" },
 };
 int n_groups = (sizeof(groups) / sizeof(struct name_count));
 
@@ -157,14 +156,6 @@ struct name_count browsers[] = {
 /* The bot index *after* sorting */
 int bot_index;
 
-
-#define EXPLORER	0
-#define MOZILLA		1
-struct name_count bgroups[] = {
-	{ .name = "Internet Explorer" },
-	{ .name  = "Mozilla" }
-};
-#define N_BGROUPS (sizeof(bgroups) / sizeof(struct name_count))
 
 int totalhits;
 int totalfiles;
@@ -595,9 +586,8 @@ void out_html()
 		while (isspace(*p))
 			++p;
 		if (*p)
-			fprintf(fp, "<tr><td bgcolor=\"#%s\">&nbsp;<td>%s"
+			fprintf(fp, "<tr><td bgcolor=\"#4fa83f\">&nbsp;<td>%s"
 				"<td align=right>%d\n",
-				agents[i].unknown ? "ff0000" : "4fa83f",
 				agents[i].name, agents[i].hits);
 		else
 			fprintf(fp, "<tr><td bgcolor=\"#ff0000\">&nbsp;"
@@ -807,6 +797,7 @@ void add_os(int group, char *name, struct name_count *agent)
 {
 	int i;
 
+#if 0
 	/* Do Windows grouping here */
 	if (strncmp(name, "Windows ", 8) == 0) {
 		if (strcmp(name + 8, "XP") &&
@@ -814,6 +805,7 @@ void add_os(int group, char *name, struct name_count *agent)
 		    strcmp(name + 8, "7"))
 			name = "Windows Other";
 	}
+#endif
 
 	os_hits  += agent->hits;
 	os_files += agent->files;
@@ -884,11 +876,7 @@ int parse_agent(struct name_count *agent)
 		browser = &browsers[BOTS];
 	/* Must put Opera before MSIE & Netscape */
 	else if (strstr(line, "Opera")) {
-#if 1
 		browser = &browsers[OPERA];
-#else
-		browser = &browsers[OTHER_BROWSER];
-#endif
 	} else if (strstr(line, "Chrome")) /* must come before safari */
 		browser = &browsers[CHROME];
 	else if (strstr(line, "Safari"))
@@ -1159,8 +1147,6 @@ void sort_oses(void)
 		      hits_compare);
 		qsort(browsers, N_BROWSERS, sizeof(struct name_count),
 		      hits_compare);
-		qsort(bgroups, N_BGROUPS, sizeof(struct name_count),
-		      hits_compare);
 		break;
 	case COMPARE_FILES:
 		qsort(groups, n_groups, sizeof(struct name_count),
@@ -1171,8 +1157,6 @@ void sort_oses(void)
 		      files_compare);
 		qsort(browsers, N_BROWSERS, sizeof(struct name_count),
 		      files_compare);
-		qsort(bgroups, N_BGROUPS, sizeof(struct name_count),
-		      files_compare);
 		break;
 	case COMPARE_PAGES:
 		qsort(groups, n_groups, sizeof(struct name_count),
@@ -1182,8 +1166,6 @@ void sort_oses(void)
 		qsort(agents, n_agents, sizeof(struct name_count),
 		      pages_compare);
 		qsort(browsers, N_BROWSERS, sizeof(struct name_count),
-		      pages_compare);
-		qsort(bgroups, N_BGROUPS, sizeof(struct name_count),
 		      pages_compare);
 		break;
 	}
@@ -1285,10 +1267,3 @@ void addbot(char *bot)
 	}
 	++nbots;
 }
-
-
-/*
- * Local Variables:
- * compile-command: "gcc -O3 -Wall agent.c -o agent"
- * End:
- */
