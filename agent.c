@@ -124,13 +124,13 @@ struct name_count *unknowns;
 int n_unknown;
 int max_unknown;
 
-#define NONE		-1
 #define WINDOZE		0
 #define UNIX		1
-#define OTHER		-1
+#define OTHER		2
 struct name_count groups[] = {
 	{ .name = "Microsoft" },
 	{ .name = "Unix" },
+	{ .name = "Other" },
 };
 int n_groups = (sizeof(groups) / sizeof(struct name_count));
 
@@ -1037,9 +1037,9 @@ again:
 		else if (strncmp(p, "Macintosh", 9) == 0 ||
 			 strncmp(p, "Mac_PowerPC", 11) == 0 ||
 			 strncmp(p, "Mac_PPC", 7) == 0)
-			add_os(NONE, "Macintosh", agent);
+			add_os(OTHER, "Macintosh", agent);
 		else {
-			add_os(NONE, "Macintosh", agent);
+			add_os(OTHER, "Macintosh", agent);
 			printf("Macintosh unknown: %s\n", line);
 			return 0; /* Put in unknown page */
 		}
@@ -1082,13 +1082,13 @@ again:
 	/* Unix */
 
 	else if (strstr(line, "BlackBerry"))
-		add_os(NONE, "BlackBerry", agent);
+		add_os(OTHER, "Mobile", agent); /* SAM ? */
 	else if (strstr(line, "Java"))
-		add_os(NONE, "Java/Perl", agent);
+		add_os(OTHER, "Java/Perl", agent);
 	else if (strstr(line, "libwww-perl"))
-		add_os(NONE, "Java/Perl", agent);
+		add_os(OTHER, "Java/Perl", agent);
 	else if (strstr(line, "Nintendo Wii"))
-		add_os(NONE, "Wii", agent);
+		add_os(OTHER, "Wii", agent);
 	else if (strstr(line, "WebTV"))
 		add_os(OTHER, "WebTV", agent);
 	else if (strstr(line, "RISC OS"))
@@ -1126,7 +1126,7 @@ again:
 	else if (strncmp(line, "Teleport Pro", 12) == 0) /* windows only */
 		add_os(WINDOZE, "Windows Other", agent); /* other */
 	else {
-		add_os(NONE, "Unknown", agent);
+		add_os(OTHER, "Unknown", agent);
 		add_unknown(agent);
 		return 0;
 	}
