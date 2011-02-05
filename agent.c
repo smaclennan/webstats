@@ -483,9 +483,9 @@ void out_html()
 		if (browsers[i].hits == 0)
 			continue;
 		fprintf(fp, "<tr><td class=day>%d"
-			"<td class=n>%d<td>%.0f%%"
-			"<td class=n>%d<td>%.0f%%"
-			"<td class=n>%d<td>%.0f%%\n"
+			"<td class=n>%d<td>%.1f%%"
+			"<td class=n>%d<td>%.1f%%"
+			"<td class=n>%d<td>%.1f%%\n"
 			"<td class=text>%s\n",
 			i + 1,
 			browsers[i].hits,
