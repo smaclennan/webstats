@@ -736,7 +736,8 @@ void process_file(FILE *fp)
 						page = 1;
 				} else if (!strstr(url, "style"))
 					page = 1;
-			} else if (strncmp(url, "HEAD ", 5))
+			} else if (strncmp(url, "HEAD ", 5) &&
+				   strncmp(url, "POST ", 5))
 				printf("PROBLEM %s\n", url);
 		}
 
