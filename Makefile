@@ -1,4 +1,4 @@
-CFLAGS = -O3 -Wall
+CFLAGS = -Wall -g3
 
 agent:	agent.c
 

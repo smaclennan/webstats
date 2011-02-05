@@ -60,7 +60,6 @@ static struct urlstr {
 	{ "/ftp.seanm.ca/", 0 },
 	{ "/rippers.ca", 0 }, { "/www.rippers.ca/", 0 },
 	{ "/seanm.dyndns.org/", 0 },
-	{ "/thetruthfulfew.com/", 0 }, { "/www.thetruthfulfew.com/", 0 }
 };
 #define NUMURLS (sizeof(urllist) / sizeof(struct urlstr))
 
@@ -128,11 +127,10 @@ int max_unknown;
 #define NONE		-1
 #define WINDOZE		0
 #define UNIX		1
-#define OTHER		3
+#define OTHER		-1
 struct name_count groups[] = {
 	{ .name = "Microsoft" },
 	{ .name = "Unix" },
-	{ .name = "Other" },
 };
 int n_groups = (sizeof(groups) / sizeof(struct name_count));
 
@@ -143,6 +141,7 @@ int n_groups = (sizeof(groups) / sizeof(struct name_count));
 #define OPERA			4
 #define SAFARI			5
 #define CHROME			6
+#define EMPTY			7
 struct name_count browsers[] = {
 	{ .name = "Everybody Else(tm)" },
 	{ .name = "Internet Explorer" },
@@ -151,20 +150,13 @@ struct name_count browsers[] = {
 	{ .name = "Opera" },
 	{ .name = "Safari" },
 	{ .name = "Chrome" },
+	{ .name = "Empty" },
 };
 #define N_BROWSERS (sizeof(browsers) / sizeof(struct name_count))
 
 /* The bot index *after* sorting */
 int bot_index;
-
-
-#define EXPLORER	0
-#define MOZILLA		1
-struct name_count bgroups[] = {
-	{ .name = "Internet Explorer" },
-	{ .name  = "Mozilla" }
-};
-#define N_BGROUPS (sizeof(bgroups) / sizeof(struct name_count))
+int empty_index;
 
 int totalhits;
 int totalfiles;
@@ -214,19 +206,25 @@ static double percent_pages(int pages)
 static double percent_browser_hits(int hits)
 {
 	return (double)hits * 100.0 /
-		(double)(totalhits - browsers[bot_index].hits);
+		(double)(totalhits -
+			 browsers[bot_index].hits -
+			 browsers[empty_index].hits);
 }
 
 static double percent_browser_files(int files)
 {
 	return (double)files * 100.0 /
-		(double)(totalfiles - browsers[bot_index].files);
+		(double)(totalfiles -
+			 browsers[bot_index].files -
+			 browsers[empty_index].files);
 }
 
 static double percent_browser_pages(int pages)
 {
 	return (double)pages * 100.0 /
-		(double)(totalpages - browsers[bot_index].pages);
+		(double)(totalpages -
+			 browsers[bot_index].pages -
+			 browsers[empty_index].pages);
 }
 
 static double percent_os_hits(int hits)
@@ -467,6 +465,18 @@ void out_html()
 		browsers[bot_index].pages,
 		percent_pages(browsers[bot_index].pages),
 		browsers[bot_index].name);
+	fprintf(fp, "<tr><td class=day>1"
+		"<td class=n>%d<td>%.0f%%"
+		"<td class=n>%d<td>%.0f%%"
+		"<td class=n>%d<td>%.0f%%\n"
+		"<td class=text>%s\n",
+		browsers[empty_index].hits,
+		percent_hits(browsers[empty_index].hits),
+		browsers[empty_index].files,
+		percent_files(browsers[empty_index].files),
+		browsers[empty_index].pages,
+		percent_pages(browsers[empty_index].pages),
+		browsers[empty_index].name);
 	fprintf(fp, "</table>\n");
 
 	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=2 CELLSPACING=1 "
@@ -478,7 +488,7 @@ void out_html()
 		"<th class=pages colspan=2>Pages\n"
 		"<th class=name>Browser\n");
 	for (i = 0; i < N_BROWSERS; ++i) {
-		if (i == bot_index)
+		if (i == bot_index || i == empty_index)
 			continue;
 		if (browsers[i].hits == 0)
 			continue;
@@ -595,9 +605,8 @@ void out_html()
 		while (isspace(*p))
 			++p;
 		if (*p)
-			fprintf(fp, "<tr><td bgcolor=\"#%s\">&nbsp;<td>%s"
+			fprintf(fp, "<tr><td bgcolor=\"#4fa83f\">&nbsp;<td>%s"
 				"<td align=right>%d\n",
-				agents[i].unknown ? "ff0000" : "4fa83f",
 				agents[i].name, agents[i].hits);
 		else
 			fprintf(fp, "<tr><td bgcolor=\"#ff0000\">&nbsp;"
@@ -809,9 +818,11 @@ void add_os(int group, char *name, struct name_count *agent)
 
 	/* Do Windows grouping here */
 	if (strncmp(name, "Windows ", 8) == 0) {
-		if (strcmp(name + 8, "XP") &&
-		    strcmp(name + 8, "Vista") &&
-		    strcmp(name + 8, "7"))
+		/* These are all < 0.5% */
+		char *w = name + 8;
+		if (strcmp(w, "ME") == 0 ||
+		    strcmp(w, "95") == 0 ||
+		    strcmp(w, "NT") == 0)
 			name = "Windows Other";
 	}
 
@@ -880,15 +891,22 @@ int parse_agent(struct name_count *agent)
 	totalfiles += agent->files;
 	totalpages += agent->pages;
 
-	if (isabot(line))
+	/* Skip leading whitespace */
+	while (isspace(*line))
+		++line;
+	/* Remove trailing whitespace */
+	p = line + strlen(line) - 1;
+	if (p > line)
+		while (isspace(*p))
+			*p-- = '\0';
+
+	if (*line == '\0' || strcmp(line, "Mozilla/4.0 (compatible;)") == 0)
+		browser = &browsers[EMPTY];
+	else if (isabot(line))
 		browser = &browsers[BOTS];
 	/* Must put Opera before MSIE & Netscape */
 	else if (strstr(line, "Opera")) {
-#if 1
 		browser = &browsers[OPERA];
-#else
-		browser = &browsers[OTHER_BROWSER];
-#endif
 	} else if (strstr(line, "Chrome")) /* must come before safari */
 		browser = &browsers[CHROME];
 	else if (strstr(line, "Safari"))
@@ -946,7 +964,7 @@ int parse_agent(struct name_count *agent)
 	}
 
 	/* Bots don't count in the OS count */
-	if (browser == &browsers[BOTS])
+	if (browser == &browsers[BOTS] || browser == &browsers[EMPTY])
 		return 0;
 
 	/* Try to intuit the OS */
@@ -1025,7 +1043,9 @@ again:
 			printf("Macintosh unknown: %s\n", line);
 			return 0; /* Put in unknown page */
 		}
-	}
+	} else if (strstr(line, "AppleWebKit"))
+		/* Assume Mac OS X */
+		add_os(UNIX, "Macintosh", agent);
 
 	/* Unix */
 	else if (strstr(line, "Linux"))
@@ -1067,6 +1087,8 @@ again:
 		add_os(NONE, "Java/Perl", agent);
 	else if (strstr(line, "libwww-perl"))
 		add_os(NONE, "Java/Perl", agent);
+	else if (strstr(line, "Nintendo Wii"))
+		add_os(NONE, "Wii", agent);
 	else if (strstr(line, "WebTV"))
 		add_os(OTHER, "WebTV", agent);
 	else if (strstr(line, "RISC OS"))
@@ -1090,7 +1112,9 @@ again:
 	else if (strncmp(line, "Amiga", 5) == 0)
 		add_os(OTHER, "Amiga", agent);
 	else if (strstr(line, "UP.Browser")) /* Cell phone browser */
-		add_os(OTHER, "Other", agent);
+		add_os(OTHER, "Mobile", agent);
+	else if (strstr(line, "Presto"))
+		add_os(OTHER, "Mobile", agent);
 	else if (strstr(line, "eCatch")) /* windows only */
 		add_os(WINDOZE, "Windows Other", agent); /* other */
 	else if (strstr(line, "Offline Explorer")) /* windows only */
@@ -1159,8 +1183,6 @@ void sort_oses(void)
 		      hits_compare);
 		qsort(browsers, N_BROWSERS, sizeof(struct name_count),
 		      hits_compare);
-		qsort(bgroups, N_BGROUPS, sizeof(struct name_count),
-		      hits_compare);
 		break;
 	case COMPARE_FILES:
 		qsort(groups, n_groups, sizeof(struct name_count),
@@ -1170,8 +1192,6 @@ void sort_oses(void)
 		qsort(agents, n_agents, sizeof(struct name_count),
 		      files_compare);
 		qsort(browsers, N_BROWSERS, sizeof(struct name_count),
-		      files_compare);
-		qsort(bgroups, N_BGROUPS, sizeof(struct name_count),
 		      files_compare);
 		break;
 	case COMPARE_PAGES:
@@ -1183,8 +1203,6 @@ void sort_oses(void)
 		      pages_compare);
 		qsort(browsers, N_BROWSERS, sizeof(struct name_count),
 		      pages_compare);
-		qsort(bgroups, N_BGROUPS, sizeof(struct name_count),
-		      pages_compare);
 		break;
 	}
 	qsort(unknowns, n_unknown, sizeof(struct name_count), hits_compare);
@@ -1192,6 +1210,8 @@ void sort_oses(void)
 	for (i = 0; i < N_BROWSERS; ++i)
 		if (strncmp(browsers[i].name, "Bot", 3) == 0)
 			bot_index = i;
+		else if (strncmp(browsers[i].name, "Empty", 5) == 0)
+			empty_index = i;
 
 	/* Drop empty groups */
 	while (n_groups > 0 && groups[n_groups - 1].hits == 0) {
@@ -1285,10 +1305,3 @@ void addbot(char *bot)
 	}
 	++nbots;
 }
-
-
-/*
- * Local Variables:
- * compile-command: "gcc -O3 -Wall agent.c -o agent"
- * End:
- */
