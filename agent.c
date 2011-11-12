@@ -18,6 +18,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#define _GNU_SOURCE /* for strcasestr */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,6 +50,7 @@
 #define ALL_FILE	"all.html"
 
 
+#ifdef THTTPD
 static struct urlstr {
 	char *str;
 	int len;
@@ -62,6 +64,7 @@ static struct urlstr {
 	{ "/seanm.dyndns.org/", 0 },
 };
 #define NUMURLS (sizeof(urllist) / sizeof(struct urlstr))
+#endif
 
 
 char *defbots[] = {
@@ -260,10 +263,12 @@ void usage()
 
 static void init_urllist(void)
 {
+#ifdef THTTPD
 	int i;
 
 	for (i = 0; i < NUMURLS; ++i)
 		urllist[i].len = strlen(urllist[i].str);
+#endif
 }
 
 
@@ -661,6 +666,7 @@ void out_html()
 	fclose(fp);
 }
 
+#ifdef THTTPD
 static int check_url(char *url)
 {
 	int i;
@@ -674,6 +680,7 @@ static int check_url(char *url)
 
 	return 0;
 }
+#endif
 
 void process_file(FILE *fp)
 {
@@ -717,6 +724,7 @@ void process_file(FILE *fp)
 			/* Count pages */
 			/* SAM This should parse better */
 			if (strncmp(url, "GET ", 4) == 0) {
+#ifdef THTTPD
 				int n;
 
 				url += 4;
@@ -726,6 +734,9 @@ void process_file(FILE *fp)
 					printf("PROBS: %s\n", url);
 				else
 					url += n;
+#else
+				url += 4;
+#endif
 
 				p = strchr(url, ' ');
 				if (p)
@@ -924,6 +935,7 @@ int parse_agent(struct name_count *agent)
 		case '6':
 		case '7':
 		case '8':
+		case '9':
 			browser = &browsers[MSIE];
 			break;
 		default:
