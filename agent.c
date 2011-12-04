@@ -18,6 +18,7 @@
  * Boston, MA 02111-1307, USA.
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -176,8 +177,6 @@ static void badline(char *line, char *p, int n)
 	printf("%s", line);
 	if (p)
 		printf("%s", p);
-
-/* 	exit(1); */
 }
 
 static void process_file(FILE *fp);
@@ -1126,6 +1125,8 @@ again:
 		add_os(WINDOZE, "Windows Other", agent); /* other */
 	else if (strncmp(line, "Teleport Pro", 12) == 0) /* windows only */
 		add_os(WINDOZE, "Windows Other", agent); /* other */
+	else if (strcasestr(line, "facebook"))
+		add_os(OTHER, "Facebook", agent);
 	else {
 		add_os(OTHER, "Unknown", agent);
 		add_unknown(agent);
