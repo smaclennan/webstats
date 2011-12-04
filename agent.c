@@ -927,6 +927,9 @@ int parse_agent(struct name_count *agent)
 		for (p += 4; isspace(*p) || *p == '+'; ++p)
 			;
 		switch (*p) {
+		default:
+			printf("UNKNOWN MSIE %s\n", p);
+			/* fall thru */
 		case '1':
 		case '2':
 		case '3':
@@ -937,11 +940,6 @@ int parse_agent(struct name_count *agent)
 		case '8':
 		case '9':
 			browser = &browsers[MSIE];
-			break;
-		default:
-			browser = &browsers[MSIE];
-			printf("UNKNOWN MSIE %s\n", p);
-			break;
 		}
 	} else if ((p = strstr(line, "Mozilla")) &&
 		   !strstr(line, "ompatible")) {
