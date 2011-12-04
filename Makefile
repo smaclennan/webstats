@@ -1,8 +1,14 @@
 CFLAGS = -Wall -g3
 
+all:	agent parse-logs webstats
+
 agent:	agent.c
 
-all:	agent
+parse-logs: parse-logs.c
+	gcc -O3 -Wall parse-logs.c -o parse-logs -ldb -lz
+
+webstats: webstats.c
+	gcc -O3 -Wall webstats.c -o webstats -lgd -ldb
 
 clean:
-	rm -f agent TAGS core
+	rm -f agent parse-logs webstats TAGS core
