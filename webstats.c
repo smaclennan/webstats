@@ -347,6 +347,10 @@ static void parse_logfile(char *logfile)
 			continue;
 		}
 
+		/* Don't count local access. */
+		if (strncmp(ip, "192.168.", 8) == 0)
+			continue;
+
 		parse_date(&tm, month);
 
 		/* Unqualified lines */
