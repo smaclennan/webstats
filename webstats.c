@@ -219,8 +219,6 @@ static void out_gopher(char *fname)
 	      , fp);
 
 	for (i = 0; i < n_sites; ++i) {
-		if (sites[i].hits == 0)
-			continue;
 		fprintf(fp, "<tr><td>%s"
 			"<td align=right>%d"
 			"<td align=right>%ld"
@@ -235,6 +233,17 @@ static void out_gopher(char *fname)
 #endif
 			"\n");
 	}
+
+	fprintf(fp, "<tr><td>Totals<td align=right>%ld"
+		"<td align=right>%ld\n"
+#ifdef ENABLE_VISITS
+		"<td align=right>%ld\n"
+#endif
+		, total_hits, total_size / 1024
+#ifdef ENABLE_VISITS
+		, total_visits
+#endif
+		);
 
 	fprintf(fp, "</table>\n");
 
@@ -540,7 +549,7 @@ static void parse_logfile(char *logfile)
 static void parse_gopher_log(char *logfile)
 {
 	char line[4096], url[4096];
-	int len;
+	int len, site;
 	gzFile fp = gzopen(logfile, "rb");
 	if (!fp) {
 		perror(logfile);
@@ -582,11 +591,13 @@ static void parse_gopher_log(char *logfile)
 
 		parse_date(&tm, month);
 
-		++sites[0].hits;
-		sites[0].size += size;
+		site = strstr(url, "HTTP/1.") == NULL;
 
-		if (status == 200 && db_put(sites[0].ipdb, ip) == 0) {
-			++sites[0].visits;
+		++sites[site].hits;
+		sites[site].size += size;
+
+		if (status == 200 && db_put(sites[site].ipdb, ip) == 0) {
+			++sites[site].visits;
 			if (verbose)
 				printf("visit %s\n", ip);
 		}
@@ -615,7 +626,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'G':
 			gopher = 1;
-			n_sites = 1;
+			n_sites = 2;
+			sites[0].name = "Gopher";
+			sites[1].name = "HTTP";
 			break;
 		default:
 			puts("Sorry!");
