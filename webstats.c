@@ -34,15 +34,6 @@ static inline void db_close(char *fname, DB *db) {}
 static int lineno;
 static int max;
 
-/* SAM DBG */
-static unsigned ftp_pages;
-static unsigned talkbass;
-static unsigned talkbass_page;
-static unsigned talkbass_size;
-
-static void dbg_out(void);
-/* SAM */
-
 static struct site {
 	char *name;
 	int color;
@@ -389,17 +380,6 @@ static void update_site(int i, unsigned long size, int status,
 	++sites[i].hits;
 	sites[i].size += size;
 
-	if (i == 2) { /* ftp.seanm.ca */
-		++ftp_pages;
-		if (strstr(refer, "talkbass")) {
-			if (ispage(url))
-				++talkbass_page;
-			else
-				++talkbass;
-			talkbass_size += size;
-		}
-	}
-
 	if (status == 200 && ispage(url) && isbrowser(who)) {
 		if (db_put(sites[i].ipdb, ip) == 0) {
 			++sites[i].visits;
@@ -668,8 +648,6 @@ int main(int argc, char *argv[])
 
 	printf("Max line %d\n", max); // SAM DBG
 
-	dbg_out();
-
 	return 0;
 }
 
@@ -785,22 +763,6 @@ static void db_close(char *fname, DB *db)
 }
 #endif
 
-
-static void dbg_out(void)
-{
-	time_t now = time(NULL);
-	FILE *fp = fopen("/tmp/ftpstats", "a");
-	if (!fp)
-		return;
-
-	fputs(ctime(&now), fp);
-	fprintf(fp, "ftp_pages:\t%6u\n", ftp_pages);
-	fprintf(fp, "talkbass:\t%6u\n", talkbass);
-	fprintf(fp, "talkbass_page:\t%6u\n", talkbass_page);
-	fprintf(fp, "talkbass_size:\t%6u M\n", talkbass_size / 1024 / 1024);
-
-	fclose(fp);
-}
 
 /*
  * Local Variables:
