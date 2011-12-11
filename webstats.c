@@ -102,6 +102,36 @@ static char *filename(char *fname)
 	return out;
 }
 
+static void out_header(FILE *fp, char *title)
+{
+	/* Header proper */
+	fprintf(fp,
+		"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n"
+		"<html lang=\"en\">\n"
+		"<head>\n"
+		"  <title>%s</title>\n"
+		"  <meta http-equiv=\"Content-type\" content=\"text/html;charset=utf-8\">\n"
+		"  <style type=\"text/css\"> <!-- body { margin: 0 10%%; } --> </style>\n"
+		"</head>\n", title);
+
+	/* Body */
+	fprintf(fp, "<body BGCOLOR=\"#E8E8E8\">\n");
+	fprintf(fp, "<h2>%s</h2>\n", title);
+	fprintf(fp, "<small><strong>\n");
+	/* Warning: cur_time/date has a local static for buffer */
+	fprintf(fp, "Summary Period: %s", cur_date(min_date));
+	fprintf(fp, " to %s (%d days)<br>\n", cur_date(max_date), days());
+	fprintf(fp, "Generated %s<br>\n", cur_time(time(NULL)));
+	fprintf(fp, "</strong></small>\n<hr>\n");
+	fprintf(fp, "<center>\n\n");
+}
+
+static void out_trailer(FILE *fp)
+{
+	/* trailer */
+	fprintf(fp, "\n</center>\n</body>\n</html>\n");
+}
+
 static void out_html(char *fname)
 {
 	int i;
@@ -111,26 +141,7 @@ static void out_html(char *fname)
 		return;
 	}
 
-	/* static header */
-	fputs("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n"
-	      "<html lang=\"en\">\n"
-	      "<head>\n"
-	      "  <title>Statistics for YOW</title>\n"
-	      "  <meta http-equiv=\"Content-type\" content=\"text/html;charset=utf-8\">\n"
-	      "  <style type=\"text/css\"> <!-- body { margin: 0 10%; } --> </style>\n"
-	      "</head>\n"
-	      ,fp);
-
-	/* Body */
-	fprintf(fp, "<body BGCOLOR=\"#E8E8E8\">\n");
-	fprintf(fp, "<h2>Statistics for YOW</h2>\n");
-	fprintf(fp, "<small><strong>\n");
-	/* Warning: cur_time/date has a local static for buffer */
-	fprintf(fp, "Summary Period: %s", cur_date(min_date));
-	fprintf(fp, " to %s (%d days)<br>\n", cur_date(max_date), days());
-	fprintf(fp, "Generated %s<br>\n", cur_time(time(NULL)));
-	fprintf(fp, "</strong></small>\n<hr>\n");
-	fprintf(fp, "<center>\n\n");
+	out_header(fp, "Statistics for YOW");
 
 	fprintf(fp, "<p><img src=\"pie.gif\" width=%d height=235 alt=\"Pie Charts\">\n\n",
 		WIDTH);
@@ -180,9 +191,54 @@ static void out_html(char *fname)
 
 	fprintf(fp, "</table>\n");
 
+	out_trailer(fp);
 
-	/* trailer */
-	fprintf(fp, "\n</center></body>\n</html>\n");
+	fclose(fp);
+}
+
+static void out_gopher(char *fname)
+{
+	int i;
+	FILE *fp = fopen(fname, "w");
+	if (!fp) {
+		perror(fname);
+		return;
+	}
+
+	out_header(fp, "Statistics for YOW gopher");
+
+	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=2 CELLSPACING=1 CELLPADDING=1");
+	fprintf(fp, " summary=\"Satistics.\">\n");
+
+	fputs("<tr><th>Site"
+	      "<th>Hits"
+	      "<th>Size (M)\n"
+#ifdef ENABLE_VISITS
+	      "<th>Visits\n"
+#endif
+	      , fp);
+
+	for (i = 0; i < n_sites; ++i) {
+		if (sites[i].hits == 0)
+			continue;
+		fprintf(fp, "<tr><td>%s"
+			"<td align=right>%d"
+			"<td align=right>%ld"
+#ifdef ENABLE_VISITS
+			"<td align=right>%ld"
+#endif
+			"%s", sites[i].name,
+			sites[i].hits,
+			sites[i].size / 1024,
+#ifdef ENABLE_VISITS
+			sites[i].visits,
+#endif
+			"\n");
+	}
+
+	fprintf(fp, "</table>\n");
+
+	out_trailer(fp);
 
 	fclose(fp);
 }
@@ -483,9 +539,8 @@ static void parse_logfile(char *logfile)
  * virtual sites. */
 static void parse_gopher_log(char *logfile)
 {
-	char line[4096], url[4096], refer[4096], who[4096];
-	struct list *l;
-	int len, i;
+	char line[4096], url[4096];
+	int len;
 	gzFile fp = gzopen(logfile, "rb");
 	if (!fp) {
 		perror(logfile);
@@ -493,7 +548,7 @@ static void parse_gopher_log(char *logfile)
 	}
 
 	while (gzgets(fp, line, sizeof(line))) {
-		char ip[20], host[20], month[8];
+		char ip[20], month[8];
 		int status;
 		unsigned long size;
 		struct tm tm;
@@ -511,12 +566,12 @@ static void parse_gopher_log(char *logfile)
 
 		memset(&tm, 0, sizeof(tm));
 		if (sscanf(line,
-			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
+			   "%s - - [%d/%[^/]/%d:%d:%d:%d %*d] "
 			   "\"%[^\"]\" %d %lu",
-			   ip, host,
+			   ip,
 			   &tm.tm_mday, month, &tm.tm_year,
 			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
-			   url, &status, &size) != 11) {
+			   url, &status, &size) != 10) {
 			printf("%d: Error %s", lineno, line);
 			continue;
 		}
@@ -527,45 +582,14 @@ static void parse_gopher_log(char *logfile)
 
 		parse_date(&tm, month);
 
-		/* Unqualified lines */
-		if (*host == '-') {
-#if 0
-			puts(line);
-#endif
-			update_site(0, size, status, ip, url, who, refer);
-			continue;
+		++sites[0].hits;
+		sites[0].size += size;
+
+		if (status == 200 && db_put(sites[0].ipdb, ip) == 0) {
+			++sites[0].visits;
+			if (verbose)
+				printf("visit %s\n", ip);
 		}
-
-		for (i = 1; i < n_sites; ++i)
-			if (strstr(host, sites[i].name)) {
-				update_site(i, size, status, ip, url, who, refer);
-				break;
-			}
-
-		if (i < n_sites)
-			continue; /* matched */
-
-		if (strcmp(host, "yow") == 0 ||
-		    strcmp(host, "localhost") == 0 ||
-		    strcmp(host, "192.168.0.1") == 0 ||
-		    strcmp(host, "127.0.0.1") == 0)
-			continue; /* don't count locals */
-
-		/* lighttpd defaults to seanm.ca for everything else */
-		update_site(0, size, status, ip, url, who, refer);
-
-#if 1
-		if (strstr(host, "seanm.ca") == NULL) {
-			for (l = others; l; l = l->next)
-				if (strcmp(l->name, host) == 0)
-					break;
-
-			if (!l) {
-				add_others(host);
-				puts(host);
-			}
-		}
-#endif
 	}
 
 	gzclose(fp);
@@ -591,6 +615,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'G':
 			gopher = 1;
+			n_sites = 1;
 			break;
 		default:
 			puts("Sorry!");
@@ -643,8 +668,12 @@ int main(int argc, char *argv[])
 	if (total_size == 0)
 		total_size = 1;
 
-	out_graphs();
-	out_html(filename(outfile));
+	if (gopher)
+		out_gopher(outfile);
+	else {
+		out_graphs();
+		out_html(filename(outfile));
+	}
 
 	printf("Max line %d\n", max); // SAM DBG
 
