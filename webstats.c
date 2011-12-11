@@ -466,10 +466,10 @@ static void parse_logfile(char *logfile)
 	}
 
 	while (gzgets(fp, line, sizeof(line))) {
-		char ip[20], host[20], month[8];
+		char ip[20], host[20], month[8], sstr[20];
 #ifndef SIMPLE
 		char *s, *e;
-		int where;
+		int n, where;
 #endif
 		int status;
 		unsigned long size;
@@ -499,16 +499,34 @@ static void parse_logfile(char *logfile)
 			continue;
 		}
 #else
-		if (sscanf(line,
+		n = sscanf(line,
 			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
-			   "\"%[^\"]\" %d %lu \"%n",
+			   "\"%[^\"]\" %d %s \"%n",
 			   ip, host,
 			   &tm.tm_mday, month, &tm.tm_year,
 			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
-			   url, &status, &size, &where) != 11) {
-			printf("%d: Error %s", lineno, line);
+			   url, &status, sstr, &where);
+
+		if (n == 8) {
+			/* sscanf \"%[^\"]\" cannot handle an empty string. */
+			*url = '\0';
+			if (sscanf(line,
+				   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
+				   "\"\" %d %s \"%n",
+				   ip, host,
+				   &tm.tm_mday, month, &tm.tm_year,
+				   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
+				   &status, sstr, &where) != 10) {
+				printf("%d: Error [8] %s", lineno, line);
+				continue;
+			}
+		} else if (n != 11) {
+			printf("%d: Error [%d] %s", lineno, n, line);
 			continue;
 		}
+
+		/* This handles a '-' in the size field */
+		size = strtol(sstr, NULL, 10);
 
 		/* People seem to like to embed quotes in the refer
 		 * and who strings :( */
