@@ -57,7 +57,7 @@ static struct site {
 	{ "ftp.seanm.ca", 0xffa500 },
 	{ "emacs", 0x00ff00 },
 };
-#define N_SITES (sizeof(sites) / sizeof(struct site))
+static int n_sites = sizeof(sites) / sizeof(struct site);
 
 struct list {
 	char *name;
@@ -155,7 +155,7 @@ static void out_html(char *fname)
 #endif
 	      , fp);
 
-	for (i = 0; i < N_SITES; ++i) {
+	for (i = 0; i < n_sites; ++i) {
 		if (sites[i].hits == 0)
 			continue;
 		fprintf(fp, "<tr><td>%s"
@@ -209,7 +209,7 @@ static void draw_pie(gdImagePtr im, int cx, int cy, int size)
 	int color;
 	int i, s = 0, e;
 
-	for (i = 0; i < N_SITES; ++i) {
+	for (i = 0; i < n_sites; ++i) {
 		color = getcolor(im, sites[i].color);
 		/* convert percent to arc */
 		if (sites[i].arc == 0)
@@ -218,6 +218,108 @@ static void draw_pie(gdImagePtr im, int cx, int cy, int size)
 		gdImageFilledArc(im, cx, cy, size, size, s, e, color, gdArc);
 		s = e;
 	}
+}
+
+static void out_graphs()
+{
+	FILE *fp;
+	char *fname;
+	int i, tarc, color;
+	int x;
+
+	gdImagePtr im = gdImageCreate(WIDTH, 235);
+	color = gdImageColorAllocate(im, 0xff, 0xff, 0xff); /* background */
+	gdImageColorTransparent(im, color);
+
+	color = gdImageColorAllocate(im, 0, 0, 0); /* text */
+
+	gdImageString(im, gdFontMediumBold, 87, 203,
+		      (unsigned char *)"Hits", color);
+	gdImageString(im, gdFontMediumBold, 305, 203,
+		      (unsigned char *)"Bytes", color);
+#ifdef ENABLE_VISITS
+	gdImageString(im, gdFontMediumBold, 522, 203,
+		      (unsigned char *)"Visits", color);
+#endif
+
+	x = 35;
+	for (i = 0; i < n_sites; ++i) {
+		color = getcolor(im, sites[i].color);
+		gdImageString(im, gdFontSmall, x, 220,
+			      (unsigned char *)sites[i].name, color);
+		x += 100;
+	}
+
+	for (tarc = i = 0; i < n_sites; ++i) {
+		sites[i].arc = sites[i].hits * 360 / total_hits;
+		tarc += sites[i].arc;
+
+#if 0
+		printf("%s %d %ld%% %ld\n",
+		       sites[i].name,
+		       sites[i].hits,
+		       sites[i].hits * 100 / total_hits,
+		       sites[i].arc);
+#endif
+	}
+
+	/* Compensate the first arc */
+	sites[0].arc += 360 - tarc;
+
+	draw_pie(im, 100, 100, 198);
+
+	/* Calculate the size arcs */
+	for (tarc = i = 0; i < n_sites; ++i) {
+		sites[i].arc = sites[i].size * 360 / total_size;
+		tarc += sites[i].arc;
+
+#if 0
+		printf("%s %ld %ld%% %ld\n",
+		       sites[i].name,
+		       sites[i].size,
+		       sites[i].size * 100 / total_size,
+		       sites[i].arc);
+#endif
+	}
+
+	/* Compensate the first arc */
+	sites[0].arc += 360 - tarc;
+
+	draw_pie(im, 320, 100, 198);
+
+#ifdef ENABLE_VISITS
+	/* Calculate the visit arcs */
+	for (tarc = i = 0; i < n_sites; ++i) {
+		sites[i].arc = sites[i].visits * 360 / total_visits;
+		tarc += sites[i].arc;
+
+#if 0
+		printf("%s %ld %ld%% %ld\n",
+		       sites[i].name,
+		       sites[i].size,
+		       sites[i].size * 100 / total_size,
+		       sites[i].arc);
+#endif
+	}
+
+	/* Compensate the first arc */
+	sites[0].arc += 360 - tarc;
+
+	draw_pie(im, 540, 100, 198);
+#endif
+
+	/* Save to file. */
+	fname = filename(outgraph);
+	fp = fopen(fname, "wb");
+	if (!fp) {
+		perror(fname);
+		exit(1);
+	}
+	gdImageGif(im, fp);
+	fclose(fp);
+
+	/* Destroy it */
+	gdImageDestroy(im);
 }
 
 static void add_others(char *name)
@@ -362,13 +464,13 @@ static void parse_logfile(char *logfile)
 			continue;
 		}
 
-		for (i = 1; i < N_SITES; ++i)
+		for (i = 1; i < n_sites; ++i)
 			if (strstr(host, sites[i].name)) {
 				update_site(i, size, status, ip, url, who, refer);
 				break;
 			}
 
-		if (i < N_SITES)
+		if (i < n_sites)
 			continue; /* matched */
 
 		if (strcmp(host, "yow") == 0 ||
@@ -399,11 +501,7 @@ static void parse_logfile(char *logfile)
 
 int main(int argc, char *argv[])
 {
-	FILE *fp;
-	char *fname;
-	gdImagePtr im;
-	int i, tarc, color;
-	int x;
+	int i;
 
 	while ((i = getopt(argc, argv, "d:g:o:v")) != EOF)
 		switch (i) {
@@ -424,12 +522,9 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
-	for (i = 0; i < N_SITES; ++i) {
-		sites[i].ipdb = db_open(sites[i].name);
-		if (!sites[i].ipdb) {
-			printf("Unable to open db\n");
-			exit(1);
-		}
+	if (optind == argc) {
+		puts("I need a logfile to parse!");
+		exit(1);
 	}
 
 	/* preload some know others */
@@ -438,43 +533,25 @@ int main(int argc, char *argv[])
 	add_others("toronto-hs-216-138-233-67.s-ip.magma.ca");
 	add_others("m38a1.ca");
 
-	if (optind == argc)
-		parse_logfile("/var/log/thttpd.log");
-	else
-		for (i = optind; i < argc; ++i) {
-			if (verbose)
-				printf("Parsing %s...\n", argv[i]);
-			parse_logfile(argv[i]);
+	for (i = 0; i < n_sites; ++i) {
+		sites[i].ipdb = db_open(sites[i].name);
+		if (!sites[i].ipdb) {
+			printf("Unable to open db\n");
+			exit(1);
 		}
-
-	for (i = 0; i < N_SITES; ++i)
-		db_close(sites[i].name, sites[i].ipdb);
-
-	im = gdImageCreate(WIDTH, 235);
-	color = gdImageColorAllocate(im, 0xff, 0xff, 0xff); /* background */
-	gdImageColorTransparent(im, color);
-
-	color = gdImageColorAllocate(im, 0, 0, 0); /* text */
-
-	gdImageString(im, gdFontMediumBold, 87, 203,
-		      (unsigned char *)"Hits", color);
-	gdImageString(im, gdFontMediumBold, 305, 203,
-		      (unsigned char *)"Bytes", color);
-#ifdef ENABLE_VISITS
-	gdImageString(im, gdFontMediumBold, 522, 203,
-		      (unsigned char *)"Visits", color);
-#endif
-
-	x = 35;
-	for (i = 0; i < N_SITES; ++i) {
-		color = getcolor(im, sites[i].color);
-		gdImageString(im, gdFontSmall, x, 220,
-			      (unsigned char *)sites[i].name, color);
-		x += 100;
 	}
 
+	for (i = optind; i < argc; ++i) {
+		if (verbose)
+			printf("Parsing %s...\n", argv[i]);
+		parse_logfile(argv[i]);
+	}
+
+	for (i = 0; i < n_sites; ++i)
+		db_close(sites[i].name, sites[i].ipdb);
+
 	/* Calculate the totals */
-	for (i = 0; i < N_SITES; ++i) {
+	for (i = 0; i < n_sites; ++i) {
 		total_hits += sites[i].hits;
 		total_visits += sites[i].visits;
 		sites[i].size /= 1024; /* convert to k */
@@ -488,77 +565,7 @@ int main(int argc, char *argv[])
 	if (total_size == 0)
 		total_size = 1;
 
-	for (tarc = i = 0; i < N_SITES; ++i) {
-		sites[i].arc = sites[i].hits * 360 / total_hits;
-		tarc += sites[i].arc;
-
-#if 0
-		printf("%s %d %ld%% %ld\n",
-		       sites[i].name,
-		       sites[i].hits,
-		       sites[i].hits * 100 / total_hits,
-		       sites[i].arc);
-#endif
-	}
-
-	/* Compensate the first arc */
-	sites[0].arc += 360 - tarc;
-
-	draw_pie(im, 100, 100, 198);
-
-	/* Calculate the size arcs */
-	for (tarc = i = 0; i < N_SITES; ++i) {
-		sites[i].arc = sites[i].size * 360 / total_size;
-		tarc += sites[i].arc;
-
-#if 0
-		printf("%s %ld %ld%% %ld\n",
-		       sites[i].name,
-		       sites[i].size,
-		       sites[i].size * 100 / total_size,
-		       sites[i].arc);
-#endif
-	}
-
-	/* Compensate the first arc */
-	sites[0].arc += 360 - tarc;
-
-	draw_pie(im, 320, 100, 198);
-
-#ifdef ENABLE_VISITS
-	/* Calculate the visit arcs */
-	for (tarc = i = 0; i < N_SITES; ++i) {
-		sites[i].arc = sites[i].visits * 360 / total_visits;
-		tarc += sites[i].arc;
-
-#if 0
-		printf("%s %ld %ld%% %ld\n",
-		       sites[i].name,
-		       sites[i].size,
-		       sites[i].size * 100 / total_size,
-		       sites[i].arc);
-#endif
-	}
-
-	/* Compensate the first arc */
-	sites[0].arc += 360 - tarc;
-
-	draw_pie(im, 540, 100, 198);
-#endif
-
-	/* Save to file. */
-	fname = filename(outgraph);
-	fp = fopen(fname, "wb");
-	if (!fp) {
-		perror(fname);
-		exit(1);
-	}
-	gdImageGif(im, fp);
-	fclose(fp);
-
-	/* Destroy it */
-	gdImageDestroy(im);
-
+	out_graphs();
 	out_html(filename(outfile));
 
 	printf("Max line %d\n", max); // SAM DBG
