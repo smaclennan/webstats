@@ -467,6 +467,10 @@ static void parse_logfile(char *logfile)
 
 	while (gzgets(fp, line, sizeof(line))) {
 		char ip[20], host[20], month[8];
+#ifndef SIMPLE
+		char *s, *e;
+		int where;
+#endif
 		int status;
 		unsigned long size;
 		struct tm tm;
@@ -483,6 +487,7 @@ static void parse_logfile(char *logfile)
 		}
 
 		memset(&tm, 0, sizeof(tm));
+#ifdef SIMPLE
 		if (sscanf(line,
 			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
 			   "\"%[^\"]\" %d %lu \"%[^\"]\" \"%[^\"]\"",
@@ -493,6 +498,36 @@ static void parse_logfile(char *logfile)
 			printf("%d: Error %s", lineno, line);
 			continue;
 		}
+#else
+		if (sscanf(line,
+			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
+			   "\"%[^\"]\" %d %lu \"%n",
+			   ip, host,
+			   &tm.tm_mday, month, &tm.tm_year,
+			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
+			   url, &status, &size, &where) != 11) {
+			printf("%d: Error %s", lineno, line);
+			continue;
+		}
+
+		/* People seem to like to embed quotes in the refer
+		 * and who strings :( */
+		s = line + where;
+		e = s;
+		do
+			e = strchr(e, '"');
+		while (e && *(e + 1) != ' ');
+		if (!e) {
+			printf("%d: Error %s", lineno, line);
+			continue;
+		}
+
+		*e = '\0';
+		snprintf(refer, sizeof(refer), "%s", s);
+
+		/* Warning the who will contains the quotes. */
+		snprintf(who, sizeof(who), "%s", e + 2);
+#endif
 
 		/* Don't count local access. */
 		if (strncmp(ip, "192.168.", 8) == 0)
