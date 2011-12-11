@@ -513,10 +513,9 @@ static void parse_logfile(char *logfile)
 		/* People seem to like to embed quotes in the refer
 		 * and who strings :( */
 		s = line + where;
-		e = s;
-		do
-			e = strchr(e, '"');
-		while (e && *(e + 1) != ' ');
+		e = strchr(s, '"');
+		while (e && *(e + 1) != ' ')
+			e = strchr(e + 1, '"');
 		if (!e) {
 			printf("%d: Error %s", lineno, line);
 			continue;
