@@ -499,11 +499,103 @@ static void parse_logfile(char *logfile)
 	gzclose(fp);
 }
 
+/* Gopher logfile is more limited. Plus, there is no concept of
+ * virtual sites. */
+static void parse_gopher_log(char *logfile)
+{
+	char line[4096], url[4096], refer[4096], who[4096];
+	struct list *l;
+	int len, i;
+	gzFile fp = gzopen(logfile, "rb");
+	if (!fp) {
+		perror(logfile);
+		exit(1);
+	}
+
+	while (gzgets(fp, line, sizeof(line))) {
+		char ip[20], host[20], month[8];
+		int status;
+		unsigned long size;
+		struct tm tm;
+
+		++lineno;
+		len = strlen(line);
+		if (len > max) {
+			max = len;
+			if (len == sizeof(line) - 1) {
+				printf("PROBLEMS 0\n");
+				gzgets(fp, line, sizeof(line));
+				continue;
+			}
+		}
+
+		memset(&tm, 0, sizeof(tm));
+		if (sscanf(line,
+			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
+			   "\"%[^\"]\" %d %lu",
+			   ip, host,
+			   &tm.tm_mday, month, &tm.tm_year,
+			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
+			   url, &status, &size) != 11) {
+			printf("%d: Error %s", lineno, line);
+			continue;
+		}
+
+		/* Don't count local access. */
+		if (strncmp(ip, "192.168.", 8) == 0)
+			continue;
+
+		parse_date(&tm, month);
+
+		/* Unqualified lines */
+		if (*host == '-') {
+#if 0
+			puts(line);
+#endif
+			update_site(0, size, status, ip, url, who, refer);
+			continue;
+		}
+
+		for (i = 1; i < n_sites; ++i)
+			if (strstr(host, sites[i].name)) {
+				update_site(i, size, status, ip, url, who, refer);
+				break;
+			}
+
+		if (i < n_sites)
+			continue; /* matched */
+
+		if (strcmp(host, "yow") == 0 ||
+		    strcmp(host, "localhost") == 0 ||
+		    strcmp(host, "192.168.0.1") == 0 ||
+		    strcmp(host, "127.0.0.1") == 0)
+			continue; /* don't count locals */
+
+		/* lighttpd defaults to seanm.ca for everything else */
+		update_site(0, size, status, ip, url, who, refer);
+
+#if 1
+		if (strstr(host, "seanm.ca") == NULL) {
+			for (l = others; l; l = l->next)
+				if (strcmp(l->name, host) == 0)
+					break;
+
+			if (!l) {
+				add_others(host);
+				puts(host);
+			}
+		}
+#endif
+	}
+
+	gzclose(fp);
+}
+
 int main(int argc, char *argv[])
 {
-	int i;
+	int i, gopher = 0;
 
-	while ((i = getopt(argc, argv, "d:g:o:v")) != EOF)
+	while ((i = getopt(argc, argv, "d:g:o:vG")) != EOF)
 		switch (i) {
 		case 'd':
 			outdir = optarg;
@@ -516,6 +608,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'v':
 			++verbose;
+			break;
+		case 'G':
+			gopher = 1;
 			break;
 		default:
 			puts("Sorry!");
@@ -544,7 +639,10 @@ int main(int argc, char *argv[])
 	for (i = optind; i < argc; ++i) {
 		if (verbose)
 			printf("Parsing %s...\n", argv[i]);
-		parse_logfile(argv[i]);
+		if (gopher)
+			parse_gopher_log(argv[i]);
+		else
+			parse_logfile(argv[i]);
 	}
 
 	for (i = 0; i < n_sites; ++i)
