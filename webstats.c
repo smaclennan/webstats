@@ -734,7 +734,7 @@ int main(int argc, char *argv[])
 		total_size = 1;
 
 	if (gopher)
-		out_gopher(outfile);
+		out_gopher(filename(outfile));
 	else {
 		out_graphs();
 		out_html(filename(outfile));
