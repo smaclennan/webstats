@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
+#include <ctype.h>
 
 #include <zlib.h>
 
@@ -57,6 +58,7 @@ struct list {
 
 static int verbose;
 
+static struct list *includes;
 static struct list *others;
 
 static unsigned long total_hits;
@@ -129,7 +131,64 @@ static void out_header(FILE *fp, char *title)
 static void out_trailer(FILE *fp)
 {
 	/* trailer */
-	fprintf(fp, "\n</center>\n</body>\n</html>\n");
+	fprintf(fp, "\n</body>\n</html>\n");
+}
+
+static void add_include(char *fname, FILE *out)
+{
+	char line[4096], *p;
+	int state = 0;
+	FILE *in = fopen(fname, "r");
+	if (!in) {
+		perror(fname);
+		return;
+	}
+
+	fprintf(out, "\n<!-- included %s -->\n", fname);
+
+	while (fgets(line, sizeof(line), in))
+		switch (state) {
+		case 0: /* looking for body tag */
+			p = strstr(line, "<body");
+			if (p) {
+				p = strchr(p, '>');
+				if (p) {
+					state = 2;
+					for (++p; isspace(*p); ++p)
+						;
+					if (p)
+						fputs(p, out);
+				} else
+					state = 1;
+			}
+			break;
+		case 1: /* looking for body '>' */
+			p = strchr(line, '>');
+			if (p) {
+				state = 2;
+				for (++p; isspace(*p); ++p)
+					;
+				if (p)
+					fputs(line, out);
+			}
+			break;
+		case 2: /* looking for </body> */
+			p = strstr(line, "</body>");
+			if (p) {
+				state = 3;
+				*p = '\0';
+				for (p = line; isspace(*p); ++p)
+					;
+				if (*p)
+					fputs(line, out);
+			} else
+				fputs(line, out);
+			break;
+		case 3: /* waiting for EOF ;) */
+			break;
+		}
+
+	fclose(in);
 }
 
 static void out_html(char *fname)
@@ -189,7 +248,12 @@ static void out_html(char *fname)
 #endif
 		);
 
-	fprintf(fp, "</table>\n");
+	fprintf(fp, "</table>\n</center>\n");
+
+	while (includes) {
+		add_include(includes->name, fp);
+		includes = includes->next;
+	}
 
 	out_trailer(fp);
 
@@ -378,7 +442,7 @@ static void out_graphs()
 	gdImageDestroy(im);
 }
 
-static void add_others(char *name)
+static void add_list(char *name, struct list **head)
 {
 	struct list *l = calloc(1, sizeof(struct list));
 	if (!l) {
@@ -390,8 +454,13 @@ static void add_others(char *name)
 		puts("Out of memory");
 		exit(1);
 	}
-	l->next = others;
-	others = l;
+	l->next = *head;
+	*head = l;
+}
+
+static void add_others(char *name)
+{
+	add_list(name, &others);
 }
 
 static int isbrowser(char *who)
@@ -662,7 +731,7 @@ int main(int argc, char *argv[])
 {
 	int i, gopher = 0;
 
-	while ((i = getopt(argc, argv, "d:g:o:vG")) != EOF)
+	while ((i = getopt(argc, argv, "d:g:o:vGI:")) != EOF)
 		switch (i) {
 		case 'd':
 			outdir = optarg;
@@ -681,6 +750,9 @@ int main(int argc, char *argv[])
 			n_sites = 2;
 			sites[0].name = "Gopher";
 			sites[1].name = "HTTP";
+			break;
+		case 'I':
+			add_list(optarg, &includes);
 			break;
 		default:
 			puts("Sorry!");
