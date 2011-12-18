@@ -79,26 +79,32 @@ static int days(void);
 
 
 /* filename mallocs space, you should free it */
-static char *filename(char *fname)
+static char *filename(char *fname, char *ext)
 {
 	static char *out;
+	int len = strlen(fname) + 1;
 
-	if (outdir) {
-		int len = strlen(fname) + 1 + strlen(outdir) + 1;
+	if (outdir)
+		len += strlen(outdir) + 1;
+	if (ext)
+		len += strlen(ext);
 
-		out = malloc(len);
-		if (!out) {
-			printf("Out of memory\n");
-			exit(1);
-		}
+	out = malloc(len);
+	if (!out) {
+		printf("Out of memory\n");
+		exit(1);
+	}
 
+	if (outdir)
 		sprintf(out, "%s/%s", outdir, fname);
-	} else {
-		out = strdup(fname);
-		if (!out) {
-			printf("Out of memory\n");
-			exit(1);
-		}
+	else
+		strcpy(out, fname);
+
+	if (ext) {
+		char *p = strrchr(out, '.');
+		if (p)
+			*p = '\0';
+		strcat(out, ext);
 	}
 
 	return out;
@@ -256,6 +262,73 @@ static void out_html(char *fname)
 	}
 
 	out_trailer(fp);
+
+	fclose(fp);
+}
+
+static void out_hr(FILE *fp)
+{
+	fputs("-----------------------------------------------------", fp);
+#ifdef ENABLE_VISITS
+	fputs("----------------", fp);
+#endif
+	fputs("\n", fp);
+}
+
+static void out_txt(char *fname)
+{
+	int i;
+	FILE *fp = fopen(fname, "w");
+	if (!fp) {
+		perror(fname);
+		return;
+	}
+
+	fprintf(fp, "Statistics for YOW\n");
+	fprintf(fp, "Summary Period: %s", cur_date(min_date));
+	fprintf(fp, " to %s (%d days)\n", cur_date(max_date), days());
+	fprintf(fp, "Generated %s\n\n", cur_time(time(NULL)));
+
+#ifdef ENABLE_VISITS
+	fputs("Site\t\t\t Hits\t\t     Size\t    Visits\n", fp);
+#else
+	fputs("Site\t\t\t Hits\t\t     Size\n", fp);
+#endif
+	out_hr(fp);
+
+	for (i = 0; i < n_sites; ++i) {
+		if (sites[i].hits == 0)
+			continue;
+		fprintf(fp, "%-20s"
+			"%6d  %3.1f%%"
+			"\t%6ld  %3.1f%%"
+#ifdef ENABLE_VISITS
+			"\t%6ld  %3.1f%%"
+#endif
+			"\n", sites[i].name,
+			sites[i].hits,
+			(double)sites[i].hits * 100.0 / (double)total_hits,
+			sites[i].size / 1024,
+			(double)sites[i].size * 100.0 / (double)total_size
+#ifdef ENABLE_VISITS
+			,
+			sites[i].visits,
+			(double)sites[i].visits * 100.0 / (double)total_visits
+#endif
+			);
+	}
+
+	out_hr(fp);
+	fprintf(fp, "%-20s%6ld      \t"
+		"%6ld      \t"
+#ifdef ENABLE_VISITS
+		"%6ld"
+#endif
+		"\n", "Totals", total_hits, total_size / 1024
+#ifdef ENABLE_VISITS
+		, total_visits
+#endif
+		);
 
 	fclose(fp);
 }
@@ -429,7 +502,7 @@ static void out_graphs()
 #endif
 
 	/* Save to file. */
-	fname = filename(outgraph);
+	fname = filename(outgraph, NULL);
 	fp = fopen(fname, "wb");
 	if (!fp) {
 		perror(fname);
@@ -806,11 +879,13 @@ int main(int argc, char *argv[])
 		total_size = 1;
 
 	if (gopher)
-		out_gopher(filename(outfile));
+		out_gopher(filename(outfile, NULL));
 	else {
 		out_graphs();
-		out_html(filename(outfile));
+		out_html(filename(outfile, NULL));
 	}
+
+	out_txt(filename(outfile, ".txt"));
 
 	printf("Max line %d\n", max); // SAM DBG
 
