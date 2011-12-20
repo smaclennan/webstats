@@ -15,12 +15,8 @@
 
 #define ENABLE_VISITS
 #ifdef ENABLE_VISITS
-#include <db.h>
+#include "statsdb.h"
 #include <arpa/inet.h>
-
-static DB *db_open(char *fname);
-static int db_put(DB *db, char *ip);
-static void db_close(char *fname, DB *db);
 
 #define WIDTH 642
 #else
@@ -947,66 +943,3 @@ static int days(void)
 {
 	return ((max_date - min_date) / 60 / 60 + 23) / 24;
 }
-
-#ifdef ENABLE_VISITS
-static DB *db_open(char *fname)
-{
-	char dbname[128];
-	DB *db;
-
-	snprintf(dbname, sizeof(dbname), "/dev/shm/%s", fname);
-
-	if (db_create(&db, NULL, 0)) {
-		printf("db_create failed\n");
-		return NULL;
-	}
-
-	if (db->open(db, NULL, dbname, NULL, DB_HASH, DB_CREATE | DB_TRUNCATE, 0664)) {
-		printf("db_open failed\n");
-		return NULL;
-	}
-
-	return db;
-}
-
-static int db_put(DB *db, char *ip)
-{
-	DBT key, data;
-	int rc;
-	struct in_addr addr;
-
-	memset(&key, 0, sizeof(key));
-	memset(&data, 0, sizeof(data));
-
-	inet_aton(ip, &addr);
-	key.data = &addr;
-	key.size = sizeof(addr);
-
-	rc = db->put(db, NULL, &key, &data, DB_NOOVERWRITE);
-	if (rc) {
-		if (rc == -1)
-			perror("put");
-		else if (rc != DB_KEYEXIST)
-			printf("HUH? %d\n", rc);
-	}
-
-	return rc;
-}
-
-static void db_close(char *fname, DB *db)
-{
-	char dbname[128];
-
-	db->close(db, 0);
-
-	snprintf(dbname, sizeof(dbname), "/dev/shm/%s", fname);
-	unlink(dbname);
-}
-#endif
-
-
-/*
- * Local Variables:
- * compile-command: "gcc -g -Wall webstats.c -o webstats -lgd -ldb"
- * End:
- */

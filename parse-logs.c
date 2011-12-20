@@ -9,6 +9,8 @@
 
 #include <zlib.h>
 
+#include "statsdb.h"
+
 static int lineno;
 static int max;
 
@@ -20,8 +22,18 @@ static time_t min_date = 0x7fffffff, max_date;
 static char *outdir;
 static char *outfile;
 
-
 static int parse_date(struct tm *tm, char *month);
+
+/*
+#define DOMAINS
+#define PAGES
+ */
+#ifdef DOMAINS
+DB *domains;
+#endif
+#ifdef PAGES
+DB *pages;
+#endif
 
 #if 0
 static int isabot(char *who)
@@ -40,23 +52,24 @@ static int isabot(char *who)
 #endif
 
 #if 0
-static int ispage(char *url)
+static int is_page(char *url)
 {
-	char fname[4096], *p;
-	int len;
+	char *p;
 
-	if (sscanf(url, "GET %s HTTP/1.", fname) != 1)
-		return 0;
-
-	/* Asking for default page is good */
-	len = strlen(fname);
-	if (len == 0)
-		return 0;
-	if (*(fname + len - 1) == '/')
+	p = url + strlen(url);
+	if (p > url)
+		--p;
+	if (*p == '/')
 		return 1;
 
+	p = strstr(url, "index.html");
+	if (p) {
+		*p = '\0';
+		return 1;
+	}
+
 	/* Check the extension */
-	p = strrchr(fname, '.');
+	p = strrchr(url, '.');
 	if (!p)
 		return 0;
 
@@ -67,6 +80,20 @@ static int ispage(char *url)
 		return 1;
 
 	return 0;
+}
+#endif
+
+#if 0
+/* Probably only of use to me ;) */
+static int is_seanm_ca(char *host)
+{
+	if (strstr(host, "rippers.ca") ||
+	    strstr(host, "m38a1.ca") ||
+	    strcmp(host, "ftp.seanm.ca") == 0 ||
+	    strstr(host, "emacs.seanm.ca"))
+		return 0;
+
+	return 1;
 }
 #endif
 
@@ -100,12 +127,17 @@ static inline void my_fclose(FILE *fp)
 static void parse_logfile(char *logfile)
 {
 	char line[4096], url[4096], refer[4096], who[4096];
-	char how[12];
-	int len, http;
-	gzFile fp = my_fopen(logfile);
+	int len;
+	gzFile fp = gzopen(logfile, "rb");
+	if (!fp) {
+		perror(logfile);
+		exit(1);
+	}
 
-	while (my_gets(line, sizeof(line), fp)) {
-		char ip[20], host[20], month[8];
+	while (gzgets(fp, line, sizeof(line))) {
+		char ip[20], host[20], month[8], sstr[20], method[20];
+		char *s, *e;
+		int n, where;
 		int status;
 		unsigned long size;
 		struct tm tm;
@@ -116,34 +148,70 @@ static void parse_logfile(char *logfile)
 			max = len;
 			if (len == sizeof(line) - 1) {
 				printf("PROBLEMS 0\n");
-				my_gets(line, sizeof(line), fp);
+				gzgets(fp, line, sizeof(line));
 				continue;
 			}
 		}
 
 		memset(&tm, 0, sizeof(tm));
-		if (sscanf(line,
+		n = sscanf(line,
 			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
-			   "%10s %s HTTP/1.%d\" %d %lu \"%[^\"]\" \"%[^\"]\"",
+			   "\"%s %s HTTP/1.%*d\" %d %s \"%n",
 			   ip, host,
 			   &tm.tm_mday, month, &tm.tm_year,
 			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
-			   how, url, &http, &status, &size, refer, who) != 15) {
-			if (!quiet)
-				printf("%d: Error %s", lineno, line);
+			   method, url, &status, sstr, &where);
+
+		if (n == 10) {
+			/* sscanf \"%[^\"]\" cannot handle an empty string. */
+			*url = '\0';
+			if (sscanf(line,
+				   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
+				   "\"\" %d %s \"%n",
+				   ip, host,
+				   &tm.tm_mday, month, &tm.tm_year,
+				   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
+				   &status, sstr, &where) != 10) {
+				printf("%d: Error [8] %s", lineno, line);
+				continue;
+			}
+		} else if (n != 12) {
+			printf("%d: Error [%d] %s", lineno, n, line);
 			continue;
 		}
-		if (*how != '"') {
-			if (!quiet)
-				printf("%d: Error %s", lineno, line);
+
+		/* This handles a '-' in the size field */
+		size = strtol(sstr, NULL, 10);
+
+		/* People seem to like to embed quotes in the refer
+		 * and who strings :( */
+		s = line + where;
+		e = strchr(s, '"');
+		while (e && *(e + 1) != ' ')
+			e = strchr(e + 1, '"');
+		if (!e) {
+			printf("%d: Error %s", lineno, line);
 			continue;
 		}
-		memmove(how, how + 1, 10);
+
+		*e = '\0';
+		snprintf(refer, sizeof(refer), "%s", s);
+
+		/* Warning the who will contains the quotes. */
+		snprintf(who, sizeof(who), "%s", e + 2);
+
+		/* Don't count local access. */
+		if (strncmp(ip, "192.168.", 8) == 0)
+			continue;
 
 		parse_date(&tm, month);
 
-		if (strncmp(ip, "192.168.", 8) == 0)
-			continue;
+#ifdef DOMAINS
+		db_put(domains, host);
+#endif
+#ifdef PAGES
+		db_put_count(pages, url);
+#endif
 	}
 
 	my_fclose(fp);
@@ -172,6 +240,17 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
+#ifdef DOMAINS
+	domains = db_open("domains");
+	if (!domains)
+		exit(1);
+#endif
+#ifdef PAGES
+	pages = db_open("pages");
+	if (!pages)
+		exit(1);
+#endif
+
 	if (optind == argc)
 		parse_logfile(NULL);
 	else
@@ -181,6 +260,16 @@ int main(int argc, char *argv[])
 			parse_logfile(argv[i]);
 		}
 
+#ifdef DOMAINS
+	puts("Domains:");
+	db_walk(domains, print);
+	db_close("domains", domains);
+#endif
+#ifdef PAGES
+	puts("Pages:");
+	db_walk(pages, print_count);
+	db_close("pages", pages);
+#endif
 
 	return 0;
 }
@@ -214,9 +303,3 @@ static int parse_date(struct tm *tm, char *month)
 	printf("BAD MONTH %s\n", month);
 	return 1;
 }
-
-/*
- * Local Variables:
- * compile-command: "gcc -O3 -Wall parse-logs.c -o parse-logs -ldb -lz"
- * End:
- */
