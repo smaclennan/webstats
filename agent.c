@@ -30,15 +30,9 @@
 
 
 /*
- * Done - keep track of first/last date
- * Done - make basedir configurable
- * Done - get rid of ignored
- * Done - the crawlers in a file
- * Done - more dynamic allocation
  * TODO - deal with timezone
  * TODO - downcase the name for matching
  * TODO - file for OS matching
- * TODO - better defaults for bots
  */
 
 
@@ -66,42 +60,8 @@ static struct urlstr {
 #define NUMURLS (sizeof(urllist) / sizeof(struct urlstr))
 #endif
 
-
-char *defbots[] = {
-	/* Bots/Spiders/Crawlers */
-	"Googlebot",
-	"FAST-WebCrawler",
-	"Jeeves",
-	"ia_archiver",
-	"ArchitextSpider",
-	"Openbot",
-	"Slurp",
-	"Scooter",
-	"scooter",
-	"cosmos",
-	"Netcraft Web Server Survey",
-	"larbin",
-	"http://www.almaden.ibm.com/",
-	"Mercator",
-	"moget",
-	"ZyBorg",
-	"LexiBot",
-	"ipium",
-	"IPiumBot",
-	"gazz",
-	/* spam tool */
-	"Microsoft URL Control",
-	/* Link Checkers */
-	"LinkWalker",
-	"Link Sleuth", /* Xenu */
-	/* Web page validators */
-	"W3C_Validator",
-	"W3C_CSS_Validator",
-};
-#define NBOTS	(sizeof(bots) / sizeof(char *))
-
-char **bots;
-int nbots;
+static char **bots;
+static int nbots;
 
 struct name_count {
 	char *name;
@@ -113,29 +73,29 @@ struct name_count {
 
 
 /* As of 2010 this is about 4100 */
-struct name_count *agents;
-int n_agents;
-int max_agents;
+static struct name_count *agents;
+static int n_agents;
+static int max_agents;
 
 /* As of 2010 this is about 15 */
-struct name_count *os;
-int n_os;
-int max_os;
+static struct name_count *os;
+static int n_os;
+static int max_os;
 
 /* As of 2010 this is about 90 */
-struct name_count *unknowns;
-int n_unknown;
-int max_unknown;
+static struct name_count *unknowns;
+static int n_unknown;
+static int max_unknown;
 
 #define WINDOZE		0
 #define UNIX		1
 #define OTHER		2
-struct name_count groups[] = {
+static struct name_count groups[] = {
 	{ .name = "Microsoft" },
 	{ .name = "Unix" },
 	{ .name = "Other" },
 };
-int n_groups = (sizeof(groups) / sizeof(struct name_count));
+static int n_groups = (sizeof(groups) / sizeof(struct name_count));
 
 #define OTHER_BROWSER		0
 #define MSIE			1
@@ -145,7 +105,7 @@ int n_groups = (sizeof(groups) / sizeof(struct name_count));
 #define SAFARI			5
 #define CHROME			6
 #define EMPTY			7
-struct name_count browsers[] = {
+static struct name_count browsers[] = {
 	{ .name = "Everybody Else(tm)" },
 	{ .name = "Internet Explorer" },
 	{ .name = "Mozilla" },
@@ -158,20 +118,18 @@ struct name_count browsers[] = {
 #define N_BROWSERS (sizeof(browsers) / sizeof(struct name_count))
 
 /* The bot index *after* sorting */
-int bot_index;
-int empty_index;
+static int bot_index;
+static int empty_index;
 
-int totalhits;
-int totalfiles;
-int totalpages;
+static int totalhits;
+static int totalfiles;
+static int totalpages;
 
-int os_hits;
-int os_files;
-int os_pages;
+static int os_hits;
+static int os_files;
+static int os_pages;
 
-int verbose;
-
-time_t min_date = 0x7fffffff, max_date;
+static time_t min_date = 0x7fffffff, max_date;
 
 static void badline(char *line, char *p, int n)
 {
@@ -184,8 +142,8 @@ static void badline(char *line, char *p, int n)
 static void process_file(FILE *fp);
 static void add_agent(char *agent, int file, int page);
 static int  parse_agent(struct name_count *agent);
-static void sort_oses();
-static char *cur_time();
+static void sort_oses(void);
+static char *cur_time(time_t now);
 static int  parse_date(char *date);
 static void addbot(char *bot);
 
@@ -245,14 +203,14 @@ static double percent_os_pages(int pages)
 
 static void out_html();
 
-enum {
+static enum {
 	COMPARE_HITS,
 	COMPARE_FILES,
 	COMPARE_PAGES,
 } compare_type;
 
 
-void usage()
+static void usage(void)
 {
 	printf("usage: agent [-b basedir] [-f | -h] log_file ...\n");
 	exit(1);
@@ -272,30 +230,26 @@ static void init_urllist(void)
 
 static void init_bots(char *botfile)
 {
+	char line[1024], *p;
 	FILE *fp = fopen(botfile, "r");
-	if (fp) {
-		char line[1024], *p;
-
-		while (fgets(line, sizeof(line), fp)) {
-			if (*line == '#')
-				continue;
-			p = strchr(line, '\n');
-			if (p)
-				*p = '\0';
-			addbot(line);
-		}
-
-		fclose(fp);
-	} else {
-		int i;
-
-		printf("Using default bots (%d)\n", errno);
-		for (i = 0; i < NBOTS; ++i)
-			addbot(defbots[i]);
+	if (!fp) {
+		perror(botfile);
+		exit(1);
 	}
+
+	while (fgets(line, sizeof(line), fp)) {
+		if (*line == '#')
+			continue;
+		p = strchr(line, '\n');
+		if (p)
+			*p = '\0';
+		addbot(line);
+	}
+
+	fclose(fp);
 }
 
-char *must_strdup(char *str)
+static char *must_strdup(char *str)
 {
 	char *new = strdup(str);
 	if (new)
@@ -388,7 +342,7 @@ static int greater(struct name_count *group, struct name_count *os)
 	}
 }
 
-void out_html()
+static void out_html(void)
 {
 	FILE *fp;
 	int i, n, cur_group = 0;
@@ -680,7 +634,7 @@ static int check_url(char *url)
 }
 #endif
 
-void process_file(FILE *fp)
+static void process_file(FILE *fp)
 {
 	char line[4096], *p, *e, *url;
 	int status, file, page, nline = 0;
@@ -777,7 +731,7 @@ void process_file(FILE *fp)
 }
 
 
-void add_agent(char *agent, int file, int page)
+static void add_agent(char *agent, int file, int page)
 {
 	int i;
 
@@ -806,7 +760,7 @@ void add_agent(char *agent, int file, int page)
 	++n_agents;
 }
 
-void add_unknown(struct name_count *agent)
+static void add_unknown(struct name_count *agent)
 {
 	if (n_unknown == max_unknown) {
 		max_unknown += 50;
@@ -822,7 +776,7 @@ void add_unknown(struct name_count *agent)
 	++n_unknown;
 }
 
-void add_os(int group, char *name, struct name_count *agent)
+static void add_os(int group, char *name, struct name_count *agent)
 {
 	int i;
 
@@ -872,7 +826,7 @@ void add_os(int group, char *name, struct name_count *agent)
 	++n_os;
 }
 
-int isabot(char *line)
+static int isabot(char *line)
 {
 	int i;
 
@@ -891,7 +845,7 @@ int isabot(char *line)
 
 
 /* Returns 0 if unknown, 1 otherwise */
-int parse_agent(struct name_count *agent)
+static int parse_agent(struct name_count *agent)
 {
 	char *line = agent->name;
 	char *p;
@@ -915,9 +869,9 @@ int parse_agent(struct name_count *agent)
 	else if (isabot(line))
 		browser = &browsers[BOTS];
 	/* Must put Opera before MSIE & Netscape */
-	else if (strstr(line, "Opera")) {
+	else if (strstr(line, "Opera"))
 		browser = &browsers[OPERA];
-	} else if (strstr(line, "Chrome")) /* must come before safari */
+	else if (strstr(line, "Chrome")) /* must come before safari */
 		browser = &browsers[CHROME];
 	else if (strstr(line, "Safari"))
 		browser = &browsers[SAFARI];
@@ -1146,7 +1100,7 @@ again:
 }
 
 
-int hits_compare(const void *a, const void *b)
+static int hits_compare(const void *a, const void *b)
 {
 	const struct name_count *a1 = (struct name_count *)a;
 	const struct name_count *b1 = (struct name_count *)b;
@@ -1157,7 +1111,7 @@ int hits_compare(const void *a, const void *b)
 		return b1->hits - a1->hits;
 }
 
-int files_compare(const void *a, const void *b)
+static int files_compare(const void *a, const void *b)
 {
 	const struct name_count *a1 = (struct name_count *)a;
 	const struct name_count *b1 = (struct name_count *)b;
@@ -1168,7 +1122,7 @@ int files_compare(const void *a, const void *b)
 		return b1->files - a1->files;
 }
 
-int pages_compare(const void *a, const void *b)
+static int pages_compare(const void *a, const void *b)
 {
 	const struct name_count *a1 = (struct name_count *)a;
 	const struct name_count *b1 = (struct name_count *)b;
@@ -1180,7 +1134,7 @@ int pages_compare(const void *a, const void *b)
 }
 
 
-void sort_oses(void)
+static void sort_oses(void)
 {
 	int i;
 
@@ -1232,31 +1186,25 @@ void sort_oses(void)
 }
 
 
-/* Taken from webalizer */
-char *cur_time(time_t now)
+static char *cur_time(time_t now)
 {
-	static char timestamp[32]; /* SAM */
-	int local_time = 1; /* SAM */
+	static char timestamp[32];
 
 	/* convert to timestamp string */
-	if (local_time)
-		strftime(timestamp, sizeof(timestamp), "%d-%b-%Y %H:%M %Z",
-			 localtime(&now));
-	else
-		strftime(timestamp, sizeof(timestamp), "%d-%b-%Y %H:%M GMT",
-			 gmtime(&now));
+	strftime(timestamp, sizeof(timestamp), "%d-%b-%Y %H:%M %Z",
+		 localtime(&now));
 
 	return timestamp;
 }
 
 
-char *months[12] = {
+static char *months[12] = {
 	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
 	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
 
-int parse_date(char *date)
+static int parse_date(char *date)
 {
 	int tz;
 	char month[8];
@@ -1293,7 +1241,7 @@ int parse_date(char *date)
 }
 
 
-void addbot(char *bot)
+static void addbot(char *bot)
 {
 	static int max;
 

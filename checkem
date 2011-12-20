@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# By running the files one at a time we get around the
+# multiple main declarations
+echo "Running sparse on files..."
+for f in *.[ch]; do
+    sparse $f
+done
+
+echo "Running checkpatch on files..."
+for f in *.[ch]; do
+    [ $f = agent.c ] && continue
+    checkpatch --file $f | fgrep -q "no obvious style problems" || echo "$f"
+done
