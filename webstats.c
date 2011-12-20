@@ -13,23 +13,15 @@
 #include <gdfontmb.h>
 #include <gdfonts.h>
 
+#include "webstats.h"
+
+
 #define ENABLE_VISITS
 #ifdef ENABLE_VISITS
-#include "statsdb.h"
-#include <arpa/inet.h>
-
 #define WIDTH 642
 #else
 #define WIDTH 422
-
-#define DB void
-static inline DB *db_open(char *fname) { return fname; }
-static inline int db_put(DB *db, char *ip) { return 1; }
-static inline void db_close(char *fname, DB *db) {}
 #endif
-
-static int lineno;
-static int max;
 
 static struct site {
 	char *name;
@@ -61,14 +53,11 @@ static unsigned long total_hits;
 static unsigned long total_size;
 static unsigned long total_visits;
 
-static time_t min_date = 0x7fffffff, max_date;
-
 static char *outdir;
 static char *outfile = "stats.html";
 static char *outgraph = "pie.gif";
 
 
-static int parse_date(struct tm *tm, char *month);
 static char *cur_time(time_t now);
 static char *cur_date(time_t now);
 static int days(void);
@@ -204,10 +193,12 @@ static void out_html(char *fname)
 
 	out_header(fp, "Statistics for YOW");
 
-	fprintf(fp, "<p><img src=\"pie.gif\" width=%d height=235 alt=\"Pie Charts\">\n\n",
+	fprintf(fp, "<p><img src=\"pie.gif\" width=%d height=235 "
+		"alt=\"Pie Charts\">\n\n",
 		WIDTH);
 
-	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=2 CELLSPACING=1 CELLPADDING=1");
+	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=2 "
+		"CELLSPACING=1 CELLPADDING=1");
 	fprintf(fp, " summary=\"Satistics.\">\n");
 
 	fputs("<tr><th>Site"
@@ -340,7 +331,8 @@ static void out_gopher(char *fname)
 
 	out_header(fp, "Statistics for YOW gopher");
 
-	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=2 CELLSPACING=1 CELLPADDING=1");
+	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=2 "
+		"CELLSPACING=1 CELLPADDING=1");
 	fprintf(fp, " summary=\"Satistics.\">\n");
 
 	fputs("<tr><th>Site"
@@ -409,7 +401,7 @@ static void draw_pie(gdImagePtr im, int cx, int cy, int size)
 	}
 }
 
-static void out_graphs()
+static void out_graphs(void)
 {
 	FILE *fp;
 	char *fname;
@@ -553,8 +545,7 @@ static int ispage(char *url)
 	char fname[4096], *p;
 	int len;
 
-	if (sscanf(url, "GET %s HTTP/1.", fname) != 1)
-		return 0;
+	strcpy(fname, url);
 
 	/* Asking for default page is good */
 	len = strlen(fname);
@@ -577,161 +568,58 @@ static int ispage(char *url)
 	return 0;
 }
 
-static void update_site(int i, unsigned long size, int status,
-			char *ip, char *url, char *who, char *refer)
+static void update_site(int i, struct log *log)
 {
 	++sites[i].hits;
-	sites[i].size += size;
+	sites[i].size += log->size;
 
-	if (status == 200 && ispage(url) && isbrowser(who)) {
-		if (db_put(sites[i].ipdb, ip) == 0) {
+	if (log->status == 200 && ispage(log->url) && isbrowser(log->who)) {
+		if (db_put(sites[i].ipdb, log->ip) == 0) {
 			++sites[i].visits;
 			if (verbose)
-				printf("%s: %s\n", sites[i].name, ip);
+				printf("%s: %s\n", sites[i].name, log->ip);
 		}
 	}
 }
 
-static void parse_logfile(char *logfile)
+static void process_log(struct log *log)
 {
-	char line[4096], url[4096], refer[4096], who[4096];
 	struct list *l;
-	int len, i;
-	gzFile fp = gzopen(logfile, "rb");
-	if (!fp) {
-		perror(logfile);
-		exit(1);
+	int i;
+
+	/* Unqualified lines */
+	if (*log->host == '-') {
+		update_site(0, log);
+		return;
 	}
 
-	while (gzgets(fp, line, sizeof(line))) {
-		char ip[20], host[20], month[8], sstr[20];
-#ifndef SIMPLE
-		char *s, *e;
-		int n, where;
-#endif
-		int status;
-		unsigned long size;
-		struct tm tm;
-
-		++lineno;
-		len = strlen(line);
-		if (len > max) {
-			max = len;
-			if (len == sizeof(line) - 1) {
-				printf("PROBLEMS 0\n");
-				gzgets(fp, line, sizeof(line));
-				continue;
-			}
+	for (i = 1; i < n_sites; ++i)
+		if (strstr(log->host, sites[i].name)) {
+			update_site(i, log);
+			return;
 		}
 
-		memset(&tm, 0, sizeof(tm));
-#ifdef SIMPLE
-		if (sscanf(line,
-			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
-			   "\"%[^\"]\" %d %lu \"%[^\"]\" \"%[^\"]\"",
-			   ip, host,
-			   &tm.tm_mday, month, &tm.tm_year,
-			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
-			   url, &status, &size, refer, who) != 13) {
-			printf("%d: Error %s", lineno, line);
-			continue;
-		}
-#else
-		n = sscanf(line,
-			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
-			   "\"%[^\"]\" %d %s \"%n",
-			   ip, host,
-			   &tm.tm_mday, month, &tm.tm_year,
-			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
-			   url, &status, sstr, &where);
+	if (strcmp(log->host, "yow") == 0 ||
+	    strcmp(log->host, "localhost") == 0 ||
+	    strcmp(log->host, "192.168.0.1") == 0 ||
+	    strcmp(log->host, "127.0.0.1") == 0)
+		return; /* don't count locals */
 
-		if (n == 8) {
-			/* sscanf \"%[^\"]\" cannot handle an empty string. */
-			*url = '\0';
-			if (sscanf(line,
-				   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
-				   "\"\" %d %s \"%n",
-				   ip, host,
-				   &tm.tm_mday, month, &tm.tm_year,
-				   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
-				   &status, sstr, &where) != 10) {
-				printf("%d: Error [8] %s", lineno, line);
-				continue;
-			}
-		} else if (n != 11) {
-			printf("%d: Error [%d] %s", lineno, n, line);
-			continue;
-		}
-
-		/* This handles a '-' in the size field */
-		size = strtol(sstr, NULL, 10);
-
-		/* People seem to like to embed quotes in the refer
-		 * and who strings :( */
-		s = line + where;
-		e = strchr(s, '"');
-		while (e && *(e + 1) != ' ')
-			e = strchr(e + 1, '"');
-		if (!e) {
-			printf("%d: Error %s", lineno, line);
-			continue;
-		}
-
-		*e = '\0';
-		snprintf(refer, sizeof(refer), "%s", s);
-
-		/* Warning the who will contains the quotes. */
-		snprintf(who, sizeof(who), "%s", e + 2);
-#endif
-
-		/* Don't count local access. */
-		if (strncmp(ip, "192.168.", 8) == 0)
-			continue;
-
-		parse_date(&tm, month);
-
-		/* Unqualified lines */
-		if (*host == '-') {
-#if 0
-			puts(line);
-#endif
-			update_site(0, size, status, ip, url, who, refer);
-			continue;
-		}
-
-		for (i = 1; i < n_sites; ++i)
-			if (strstr(host, sites[i].name)) {
-				update_site(i, size, status, ip, url, who, refer);
-				break;
-			}
-
-		if (i < n_sites)
-			continue; /* matched */
-
-		if (strcmp(host, "yow") == 0 ||
-		    strcmp(host, "localhost") == 0 ||
-		    strcmp(host, "192.168.0.1") == 0 ||
-		    strcmp(host, "127.0.0.1") == 0)
-			continue; /* don't count locals */
-
-		/* lighttpd defaults to seanm.ca for everything else */
-		update_site(0, size, status, ip, url, who, refer);
+	/* lighttpd defaults to seanm.ca for everything else */
+	update_site(0, log);
 
 #if 1
-		if (strstr(host, "seanm.ca") == NULL) {
-			for (l = others; l; l = l->next)
-				if (strcmp(l->name, host) == 0)
-					break;
+	if (strstr(log->host, "seanm.ca") == NULL) {
+		for (l = others; l; l = l->next)
+			if (strcmp(l->name, log->host) == 0)
+				break;
 
-			if (!l) {
-				add_others(host);
-				puts(host);
-			}
+		if (!l) {
+			add_others(log->host);
+			puts(log->host);
 		}
-#endif
 	}
-
-	gzclose(fp);
+#endif
 }
 
 /* Gopher logfile is more limited. Plus, there is no concept of
@@ -740,6 +628,7 @@ static void parse_gopher_log(char *logfile)
 {
 	char line[4096], url[4096];
 	int len, site;
+	int lineno = 0, max = 0;
 	gzFile fp = gzopen(logfile, "rb");
 	if (!fp) {
 		perror(logfile);
@@ -794,6 +683,8 @@ static void parse_gopher_log(char *logfile)
 	}
 
 	gzclose(fp);
+
+	printf("Max line %d\n", max); /* SAM DBG */
 }
 
 int main(int argc, char *argv[])
@@ -853,7 +744,7 @@ int main(int argc, char *argv[])
 		if (gopher)
 			parse_gopher_log(argv[i]);
 		else
-			parse_logfile(argv[i]);
+			parse_logfile(argv[i], process_log);
 	}
 
 	for (i = 0; i < n_sites; ++i)
@@ -883,39 +774,7 @@ int main(int argc, char *argv[])
 
 	out_txt(filename(outfile, ".txt"));
 
-	printf("Max line %d\n", max); // SAM DBG
-
 	return 0;
-}
-
-static char *months[12] = {
-	"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-};
-
-
-static int parse_date(struct tm *tm, char *month)
-{
-	time_t this;
-
-	tm->tm_year -= 1900;
-
-	for (tm->tm_mon = 0; tm->tm_mon < 12; ++tm->tm_mon)
-		if (strcmp(months[tm->tm_mon], month) == 0) {
-			this = mktime(tm);
-			if (this == (time_t)-1) {
-				perror("mktime");
-				exit(1);
-			}
-			if (this > max_date)
-				max_date = this;
-			if (this < min_date)
-				min_date = this;
-			return 0; /* success */
-		}
-
-	printf("BAD MONTH %s\n", month);
-	return 1;
 }
 
 static char *cur_time(time_t now)

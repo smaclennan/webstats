@@ -1,13 +1,9 @@
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
 #include <time.h>
 
-#include "statsdb.h"
+#include "webstats.h"
 
 void print(char *key, char *data)
 {
@@ -31,7 +27,8 @@ DB *db_open(char *fname)
 		return NULL;
 	}
 
-	if (db->open(db, NULL, dbname, NULL, DB_HASH, DB_CREATE | DB_TRUNCATE, 0664)) {
+	if (db->open(db, NULL, dbname, NULL,
+		     DB_HASH, DB_CREATE | DB_TRUNCATE, 0664)) {
 		printf("db_open failed\n");
 		return NULL;
 	}
