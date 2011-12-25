@@ -670,7 +670,7 @@ static void parse_gopher_log(char *logfile)
 
 		parse_date(&tm, month);
 
-		site = strstr(url, "HTTP/1.") == NULL;
+		site = strstr(url, "HTTP/1.") != NULL;
 
 		++sites[site].hits;
 		sites[site].size += size;
