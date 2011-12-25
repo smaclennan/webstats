@@ -148,7 +148,6 @@ static char *months[12] = {
 	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
-
 int parse_date(struct tm *tm, char *month)
 {
 	time_t this;

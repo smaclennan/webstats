@@ -622,13 +622,36 @@ static void process_log(struct log *log)
 #endif
 }
 
+static int check_time(struct tm *tm, char *month, time_t *this)
+{
+	static char *months[12] = {
+		"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+	};
+	static time_t start;
+
+	if(start == 0)
+		start = time(NULL) - (31 * 24 * 60 * 60);
+
+	tm->tm_year -= 1900;
+
+	for (tm->tm_mon = 0; tm->tm_mon < 12; ++tm->tm_mon)
+		if (strcmp(months[tm->tm_mon], month) == 0) {
+			*this = mktime(tm);
+			return *this >= start;
+		}
+
+	return 0;
+}
+
+
 /* Gopher logfile is more limited. Plus, there is no concept of
  * virtual sites. */
 static void parse_gopher_log(char *logfile)
 {
 	char line[4096], url[4096];
-	int len, site;
-	int lineno = 0, max = 0;
+	int site;
+	int lineno = 0;
 	gzFile fp = gzopen(logfile, "rb");
 	if (!fp) {
 		perror(logfile);
@@ -640,17 +663,9 @@ static void parse_gopher_log(char *logfile)
 		int status;
 		unsigned long size;
 		struct tm tm;
+		time_t this;
 
 		++lineno;
-		len = strlen(line);
-		if (len > max) {
-			max = len;
-			if (len == sizeof(line) - 1) {
-				printf("PROBLEMS 0\n");
-				gzgets(fp, line, sizeof(line));
-				continue;
-			}
-		}
 
 		memset(&tm, 0, sizeof(tm));
 		if (sscanf(line,
@@ -668,9 +683,15 @@ static void parse_gopher_log(char *logfile)
 		if (strncmp(ip, "192.168.", 8) == 0)
 			continue;
 
-		parse_date(&tm, month);
+		if (!check_time(&tm, month, &this))
+			continue;
 
-		site = strstr(url, "HTTP/1.") == NULL;
+		if (this > max_date)
+			max_date = this;
+		if (this < min_date)
+			min_date = this;
+
+		site = strstr(url, "HTTP/1.") != NULL;
 
 		++sites[site].hits;
 		sites[site].size += size;
@@ -683,8 +704,6 @@ static void parse_gopher_log(char *logfile)
 	}
 
 	gzclose(fp);
-
-	printf("Max line %d\n", max); /* SAM DBG */
 }
 
 int main(int argc, char *argv[])
