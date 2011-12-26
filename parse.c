@@ -72,8 +72,7 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 			}
 		}
 
-
- 		/* Don't count local access. */
+		/* Don't count local access. */
 		if (strncmp(line, "192.168.", 8) == 0)
 			continue;
 
