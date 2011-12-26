@@ -638,7 +638,7 @@ static int check_time(struct tm *tm, char *month, time_t *this)
 	for (tm->tm_mon = 0; tm->tm_mon < 12; ++tm->tm_mon)
 		if (strcmp(months[tm->tm_mon], month) == 0) {
 			*this = mktime(tm);
-			return *this >= start;
+			return *this > start;
 		}
 
 	return 0;
@@ -746,6 +746,7 @@ int main(int argc, char *argv[])
 	/* preload some know others */
 	add_others("seanm.dyndns.org");
 	add_others("216.138.233.67");
+	add_others("216.138.233.67:80");
 	add_others("toronto-hs-216-138-233-67.s-ip.magma.ca");
 	add_others("m38a1.ca");
 
