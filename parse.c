@@ -72,6 +72,11 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 			}
 		}
 
+
+ 		/* Don't count local access. */
+		if (strncmp(line, "192.168.", 8) == 0)
+			continue;
+
 		memset(&tm, 0, sizeof(tm));
 		n = sscanf(line,
 			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
@@ -98,10 +103,6 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 			printf("%d: Error [%d] %s", lineno, n, line);
 			continue;
 		}
-
-		/* Don't count local access. */
-		if (strncmp(ip, "192.168.", 8) == 0)
-			continue;
 
 		/* This handles a '-' in the size field */
 		size = strtol(sstr, NULL, 10);
