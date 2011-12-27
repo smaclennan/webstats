@@ -16,6 +16,7 @@
 #include "webstats.h"
 
 
+#define GOPHER
 #define ENABLE_VISITS
 #ifdef ENABLE_VISITS
 #define WIDTH 642
@@ -46,7 +47,9 @@ struct list {
 
 static int verbose;
 
+#ifdef GOPHER
 static struct list *includes;
+#endif
 static struct list *others;
 
 static unsigned long total_hits;
@@ -125,6 +128,7 @@ static void out_trailer(FILE *fp)
 	fprintf(fp, "\n</body>\n</html>\n");
 }
 
+#ifdef GOPHER
 static void add_include(char *fname, FILE *out)
 {
 	char line[4096], *p;
@@ -181,6 +185,7 @@ static void add_include(char *fname, FILE *out)
 
 	fclose(in);
 }
+#endif
 
 static void out_html(char *fname)
 {
@@ -243,10 +248,12 @@ static void out_html(char *fname)
 
 	fprintf(fp, "</table>\n</center>\n");
 
+#ifdef GOPHER
 	while (includes) {
 		add_include(includes->name, fp);
 		includes = includes->next;
 	}
+#endif
 
 	out_trailer(fp);
 
@@ -320,6 +327,7 @@ static void out_txt(char *fname)
 	fclose(fp);
 }
 
+#ifdef GOPHER
 static void out_gopher(char *fname)
 {
 	int i;
@@ -376,6 +384,7 @@ static void out_gopher(char *fname)
 
 	fclose(fp);
 }
+#endif
 
 static int getcolor(gdImagePtr im, int color)
 {
@@ -622,6 +631,7 @@ static void process_log(struct log *log)
 #endif
 }
 
+#ifdef GOPHER
 static int check_time(struct tm *tm, char *month, time_t *this)
 {
 	static char *months[12] = {
@@ -705,10 +715,14 @@ static void parse_gopher_log(char *logfile)
 
 	gzclose(fp);
 }
+#endif
 
 int main(int argc, char *argv[])
 {
-	int i, gopher = 0;
+	int i;
+#ifdef GOPHER
+	int gopher = 0;
+#endif
 
 	while ((i = getopt(argc, argv, "d:g:o:vGI:")) != EOF)
 		switch (i) {
@@ -724,6 +738,7 @@ int main(int argc, char *argv[])
 		case 'v':
 			++verbose;
 			break;
+#ifdef GOPHER
 		case 'G':
 			gopher = 1;
 			n_sites = 2;
@@ -733,6 +748,7 @@ int main(int argc, char *argv[])
 		case 'I':
 			add_list(optarg, &includes);
 			break;
+#endif
 		default:
 			puts("Sorry!");
 			exit(1);
@@ -761,9 +777,11 @@ int main(int argc, char *argv[])
 	for (i = optind; i < argc; ++i) {
 		if (verbose)
 			printf("Parsing %s...\n", argv[i]);
+#ifdef GOPHER
 		if (gopher)
 			parse_gopher_log(argv[i]);
 		else
+#endif
 			parse_logfile(argv[i], process_log);
 	}
 
@@ -785,9 +803,12 @@ int main(int argc, char *argv[])
 	if (total_size == 0)
 		total_size = 1;
 
+#ifdef GOPHER
 	if (gopher)
 		out_gopher(filename(outfile, NULL));
-	else {
+	else
+#endif
+	{
 		out_graphs();
 		out_html(filename(outfile, NULL));
 	}
