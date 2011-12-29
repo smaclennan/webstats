@@ -23,8 +23,8 @@ int parse_date(struct tm *tm, char *month);
 
 
 /* Helpful db functions. */
-void print(char *key, char *data);
-void print_count(char *key, char *data);
+void print(char *key, void *data, int len);
+void print_count(char *key, void *data, int len);
 DB *db_open(char *fname);
 int db_get_data(DB *db, char *key, void *data, int len);
 int db_put_data(DB *db, char *key, void *data, int len, int flags);

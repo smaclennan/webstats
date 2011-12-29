@@ -5,12 +5,12 @@
 
 #include "webstats.h"
 
-void print(char *key, char *data)
+void print(char *key, void *data, int len)
 {
 	puts(key);
 }
 
-void print_count(char *key, char *data)
+void print_count(char *key, void *data, int len)
 {
 	printf("%s %lu\n", key, *(unsigned long *)data);
 }

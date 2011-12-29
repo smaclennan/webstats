@@ -19,15 +19,16 @@ static char *outdir;
 static char *outfile;
 
 /*
+#define PAGES
 #define DOMAINS
  */
-#define PAGES
 #ifdef DOMAINS
 DB *domains;
 #endif
 #ifdef PAGES
 DB *pages;
 static int max_url;
+static unsigned long total;
 #endif
 
 #if 0
@@ -112,6 +113,7 @@ static void process_log(struct log *log)
 #endif
 }
 
+#ifdef PAGES
 #define TEN 10
 static struct list {
 	char *name;
@@ -149,13 +151,13 @@ static void sort_pages(char *key, void *data, int len)
 			return;
 		}
 }
+#endif
 
 #define m(n)   (((((n) + 512) / 1024) + 512) / 1024)
 
 int main(int argc, char *argv[])
 {
 	int i;
-	unsigned long total = 0;
 
 	while ((i = getopt(argc, argv, "d:o:qv")) != EOF)
 		switch (i) {
@@ -216,4 +218,3 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
