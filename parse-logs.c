@@ -28,7 +28,7 @@ DB *domains;
 #ifdef PAGES
 DB *pages;
 static int max_url;
-static unsigned long total;
+static double total = 0.0;
 #endif
 
 #if 0
@@ -85,7 +85,8 @@ static int is_seanm_ca(char *host)
 {
 	if (strstr(host, "rippers.ca") ||
 	    strstr(host, "m38a1.ca") ||
-	    strcmp(host, "ftp.seanm.ca") == 0 ||
+	    strstr(host, "ftp.seanm.ca") ||
+	    strstr(host, "git.seanm.ca") ||
 	    strstr(host, "emacs.seanm.ca"))
 		return 0;
 
@@ -119,6 +120,7 @@ static struct list {
 	char *name;
 	unsigned long size;
 } top[TEN];
+int n_top;
 
 static void setup_sort(void)
 {
@@ -127,7 +129,7 @@ static void setup_sort(void)
 	printf("max_url %d\n", max_url);
 	++max_url;
 	for (i = 0; i < TEN; ++i) {
-		top[i].name = malloc(max_url);
+		top[i].name = calloc(1, max_url);
 		if (!top[i].name) {
 			printf("Out of memory\n");
 			exit(1);
@@ -140,20 +142,28 @@ static void sort_pages(char *key, void *data, int len)
 	int i, j;
 	unsigned long size = *(unsigned long *)data;
 
-	for (i = 0; i < TEN; ++i)
+	for (i = 0; i < n_top; ++i)
 		if (size > top[i].size) {
-			for (j = TEN - 1; j < i; --j) {
+			for (j = n_top - 1; j > i; --j) {
 				strcpy(top[j].name, top[j - 1].name);
 				top[j].size = top[j - 1].size;
 			}
 			strcpy(top[i].name, key);
 			top[i].size = size;
+			if (n_top < TEN)
+				++n_top;
 			return;
 		}
+
+	if (n_top < TEN) {
+		strcpy(top[n_top].name, key);
+		top[n_top].size = size;
+		++n_top;
+	}
 }
 #endif
 
-#define m(n)   (((((n) + 512) / 1024) + 512) / 1024)
+#define m(n)   (((double)(n)) / 1024.0 / 1024.0)
 
 int main(int argc, char *argv[])
 {
@@ -206,14 +216,14 @@ int main(int argc, char *argv[])
 #ifdef PAGES
 	setup_sort();
 	db_walk(pages, sort_pages);
-	db_close("pages", pages);
 
-	for (i = 0; i < 10; ++i) {
-		unsigned long size = m(top[i].size);
+	for (i = 0; i < n_top; ++i) {
+		double size = m(top[i].size);
 		total += size;
-		printf("%-60s %6lu\n", top[i].name, size);
+		printf("%-60s %.1f\n", top[i].name, size);
 	}
-	printf("Total %lu\n", total);
+
+	printf("Total %.1f\n", total);
 #endif
 
 	return 0;
