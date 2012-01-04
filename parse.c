@@ -123,7 +123,7 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 		/* Warning the who will contains the quotes. */
 		snprintf(who, sizeof(who), "%s", e + 2);
 
-		parse_date(&tm, month);
+		log.time = parse_date(&tm, month);
 
 		log.lineno = lineno;
 		log.ip = ip;
@@ -148,7 +148,7 @@ static char *months[12] = {
 	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
-int parse_date(struct tm *tm, char *month)
+time_t parse_date(struct tm *tm, char *month)
 {
 	time_t this;
 
@@ -165,10 +165,10 @@ int parse_date(struct tm *tm, char *month)
 				max_date = this;
 			if (this < min_date)
 				min_date = this;
-			return 0; /* success */
+			return this; /* success */
 		}
 
 	printf("BAD MONTH %s\n", month);
-	return 1;
+	exit(1);
 }
 

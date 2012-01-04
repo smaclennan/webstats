@@ -10,6 +10,7 @@ struct log {
 	char *ip;
 	char *host;
 	struct tm *tm;
+	time_t time;
 	char *method;
 	char *url;
 	int status;
@@ -19,7 +20,7 @@ struct log {
 };
 
 void parse_logfile(char *logfile, void (*func)(struct log *log));
-int parse_date(struct tm *tm, char *month);
+time_t parse_date(struct tm *tm, char *month);
 
 
 /* Helpful db functions. */
