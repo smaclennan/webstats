@@ -1,7 +1,3 @@
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-
 #include "webstats.h"
 
 static time_t start, end;

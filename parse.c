@@ -1,10 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-
-#include <zlib.h>
-
 #include "webstats.h"
 
 static int lineno;

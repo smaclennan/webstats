@@ -1,6 +1,16 @@
 #ifndef _WEBSTATS_H_
 #define _WEBSTATS_H_
 
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <time.h>
+#include <ctype.h>
+
+#include <zlib.h>
+
 #include <db.h>
 
 extern time_t min_date, max_date;

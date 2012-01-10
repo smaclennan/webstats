@@ -1,20 +1,9 @@
 #define _GNU_SOURCE /* for strcasestr */
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <time.h>
-#include <ctype.h>
-
-#include <zlib.h>
+#include "webstats.h"
 
 #include <gd.h>
 #include <gdfontmb.h>
 #include <gdfonts.h>
-
-#include "webstats.h"
-
 
 #define GOPHER
 #define ENABLE_VISITS
@@ -639,7 +628,7 @@ static int check_time(struct tm *tm, char *month, time_t *this)
 	};
 	static time_t start;
 
-	if(start == 0)
+	if (start == 0)
 		start = time(NULL) - (31 * 24 * 60 * 60);
 
 	tm->tm_year -= 1900;
