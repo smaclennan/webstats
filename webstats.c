@@ -18,6 +18,7 @@
 
 #define GOPHER
 #define ENABLE_VISITS
+
 #ifdef ENABLE_VISITS
 #define WIDTH 642
 #else
@@ -47,6 +48,9 @@ struct list {
 
 static int verbose;
 
+static time_t start, end;
+static time_t real_min = 0x7fffffff, real_max;
+
 #ifdef GOPHER
 static struct list *includes;
 #endif
@@ -65,6 +69,8 @@ static char *cur_time(time_t now);
 static char *cur_date(time_t now);
 static int days(void);
 
+static void init_range(int days);
+static int in_range(struct log *log);
 
 /* filename mallocs space, you should free it */
 static char *filename(char *fname, char *ext)
@@ -596,6 +602,9 @@ static void process_log(struct log *log)
 	struct list *l;
 	int i;
 
+	if (!in_range(log))
+		return;
+
 	/* Unqualified lines */
 	if (*log->host == '-') {
 		update_site(0, log);
@@ -719,12 +728,12 @@ static void parse_gopher_log(char *logfile)
 
 int main(int argc, char *argv[])
 {
-	int i;
+	int i, range_set = 0;
 #ifdef GOPHER
 	int gopher = 0;
 #endif
 
-	while ((i = getopt(argc, argv, "d:g:o:vGI:")) != EOF)
+	while ((i = getopt(argc, argv, "d:g:o:r:vGI:")) != EOF)
 		switch (i) {
 		case 'd':
 			outdir = optarg;
@@ -734,6 +743,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'o':
 			outfile = optarg;
+			break;
+		case 'r':
+			init_range(strtol(optarg, NULL, 10));
+			range_set = 1;
 			break;
 		case 'v':
 			++verbose;
@@ -787,6 +800,12 @@ int main(int argc, char *argv[])
 
 	for (i = 0; i < n_sites; ++i)
 		db_close(sites[i].name, sites[i].ipdb);
+
+	if (range_set) {
+		/* Correct these */
+		min_date = real_min;
+		max_date = real_max;
+	}
 
 	/* Calculate the totals */
 	for (i = 0; i < n_sites; ++i) {
@@ -842,4 +861,36 @@ static char *cur_date(time_t now)
 static int days(void)
 {
 	return ((max_date - min_date) / 60 / 60 + 23) / 24;
+}
+
+static void init_range(int days)
+{
+	time_t now = time(NULL);
+	struct tm *tm = localtime(&now);
+
+	tm->tm_hour = 23;
+	tm->tm_min = 59;
+	tm->tm_sec = 59;
+	--tm->tm_mday;
+	end = mktime(tm);
+
+	tm->tm_hour = 0;
+	tm->tm_min = 0;
+	tm->tm_sec = 0;
+	tm->tm_mday -= days - 1;
+	start = mktime(tm);
+}
+
+static int in_range(struct log *log)
+{
+	if (start == 0)
+		return 1;
+	else if (log->time >= start && log->time <= end) {
+		if (log->time > real_max)
+			real_max = log->time;
+		if (log->time < real_min)
+			real_min = log->time;
+		return 1;
+	} else
+		return 0;
 }

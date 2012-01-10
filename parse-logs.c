@@ -31,6 +31,11 @@ static int max_url;
 static double total = 0.0;
 #endif
 
+#ifdef RANGE
+static time_t start, end;
+static time_t real_min = 0x7fffffff, real_max;
+#endif
+
 #if 0
 static int isabot(char *who)
 {
@@ -228,3 +233,37 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+
+#ifdef RANGE
+static void init_range(int days)
+{
+	time_t now = time(NULL);
+	struct tm *tm = localtime(&now);
+
+	tm->tm_hour = 23;
+	tm->tm_min = 59;
+	tm->tm_sec = 59;
+	--tm->tm_mday;
+	end = mktime(tm);
+
+	tm->tm_hour = 0;
+	tm->tm_min = 0;
+	tm->tm_sec = 0;
+	tm->tm_mday -= days - 1;
+	start = mktime(tm);
+}
+
+static int in_range(struct log *log)
+{
+	if (start == 0)
+		return 1;
+	else if (log->time >= start && log->time <= end) {
+		if (log->time > real_max)
+			real_max = log->time;
+		if (log->time < real_min)
+			real_min = log->time;
+		return 1;
+	} else
+		return 0;
+}
+#endif
