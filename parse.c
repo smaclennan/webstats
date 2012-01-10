@@ -45,7 +45,7 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 	struct log log;
 	char line[4096], url[4096], refer[4096], who[4096];
 	int len;
-	gzFile fp = gzopen(logfile, "rb");
+	gzFile fp = my_fopen(logfile);
 	if (!fp) {
 		perror(logfile);
 		exit(1);
@@ -53,7 +53,7 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 
 	memset(&log, 0, sizeof(log));
 
-	while (gzgets(fp, line, sizeof(line))) {
+	while (my_gets(line, sizeof(line), fp)) {
 		char ip[20], host[20], month[8], sstr[20], method[20];
 		char *s, *e;
 		int n, where;
