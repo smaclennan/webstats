@@ -48,9 +48,6 @@ struct list {
 
 static int verbose;
 
-static time_t start, end;
-static time_t real_min = 0x7fffffff, real_max;
-
 #ifdef GOPHER
 static struct list *includes;
 #endif
@@ -64,13 +61,6 @@ static char *outdir;
 static char *outfile = "stats.html";
 static char *outgraph = "pie.gif";
 
-
-static char *cur_time(time_t now);
-static char *cur_date(time_t now);
-static int days(void);
-
-static void init_range(int days);
-static int in_range(struct log *log);
 
 /* filename mallocs space, you should free it */
 static char *filename(char *fname, char *ext)
@@ -225,14 +215,14 @@ static void out_html(char *fname)
 			continue;
 		fprintf(fp, "<tr><td>%s"
 			"<td align=right>%d<td align=right>%.1f%%"
-			"<td align=right>%ld<td align=right>%.1f%%"
+			"<td align=right>%.1f<td align=right>%.1f%%"
 #ifdef ENABLE_VISITS
 			"<td align=right>%ld<td align=right>%.1f%%"
 #endif
 			"%s", sites[i].name,
 			sites[i].hits,
 			(double)sites[i].hits * 100.0 / (double)total_hits,
-			sites[i].size / 1024,
+			(double)sites[i].size / 1024.0,
 			(double)sites[i].size * 100.0 / (double)total_size,
 #ifdef ENABLE_VISITS
 			sites[i].visits,
@@ -728,7 +718,7 @@ static void parse_gopher_log(char *logfile)
 
 int main(int argc, char *argv[])
 {
-	int i, range_set = 0;
+	int i;
 #ifdef GOPHER
 	int gopher = 0;
 #endif
@@ -746,7 +736,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'r':
 			init_range(strtol(optarg, NULL, 10));
-			range_set = 1;
 			break;
 		case 'v':
 			++verbose;
@@ -801,11 +790,7 @@ int main(int argc, char *argv[])
 	for (i = 0; i < n_sites; ++i)
 		db_close(sites[i].name, sites[i].ipdb);
 
-	if (range_set) {
-		/* Correct these */
-		min_date = real_min;
-		max_date = real_max;
-	}
+	range_fixup();
 
 	/* Calculate the totals */
 	for (i = 0; i < n_sites; ++i) {
@@ -837,60 +822,3 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
-static char *cur_time(time_t now)
-{
-	static char timestamp[32];
-
-	/* convert to timestamp string */
-	strftime(timestamp, sizeof(timestamp),
-		 "%b %d %Y %H:%M %Z", localtime(&now));
-
-	return timestamp;
-}
-
-static char *cur_date(time_t now)
-{
-	static char timestamp[32];
-
-	/* convert to timestamp string */
-	strftime(timestamp, sizeof(timestamp), "%b %d %Y", localtime(&now));
-
-	return timestamp;
-}
-
-static int days(void)
-{
-	return ((max_date - min_date) / 60 / 60 + 23) / 24;
-}
-
-static void init_range(int days)
-{
-	time_t now = time(NULL);
-	struct tm *tm = localtime(&now);
-
-	tm->tm_hour = 23;
-	tm->tm_min = 59;
-	tm->tm_sec = 59;
-	--tm->tm_mday;
-	end = mktime(tm);
-
-	tm->tm_hour = 0;
-	tm->tm_min = 0;
-	tm->tm_sec = 0;
-	tm->tm_mday -= days - 1;
-	start = mktime(tm);
-}
-
-static int in_range(struct log *log)
-{
-	if (start == 0)
-		return 1;
-	else if (log->time >= start && log->time <= end) {
-		if (log->time > real_max)
-			real_max = log->time;
-		if (log->time < real_min)
-			real_min = log->time;
-		return 1;
-	} else
-		return 0;
-}

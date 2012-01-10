@@ -23,6 +23,16 @@ void parse_logfile(char *logfile, void (*func)(struct log *log));
 time_t parse_date(struct tm *tm, char *month);
 
 
+/* time functions */
+char *cur_time(time_t now);
+char *cur_date(time_t now);
+int days(void);
+
+void init_range(int days);
+int in_range(struct log *log);
+void range_fixup(void);
+
+
 /* Helpful db functions. */
 void print(char *key, void *data, int len);
 void print_count(char *key, void *data, int len);

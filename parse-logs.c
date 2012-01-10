@@ -31,11 +31,6 @@ static int max_url;
 static double total = 0.0;
 #endif
 
-#ifdef RANGE
-static time_t start, end;
-static time_t real_min = 0x7fffffff, real_max;
-#endif
-
 #if 0
 static int isabot(char *who)
 {
@@ -101,6 +96,9 @@ static int is_seanm_ca(char *host)
 
 static void process_log(struct log *log)
 {
+	if (!in_range(log))
+		return;
+
 #ifdef DOMAINS
 	db_update_count(domains, log->host, 1);
 #endif
@@ -174,7 +172,7 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "d:o:qv")) != EOF)
+	while ((i = getopt(argc, argv, "d:o:qr:v")) != EOF)
 		switch (i) {
 		case 'd':
 			outdir = optarg;
@@ -184,6 +182,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'q':
 			quiet = 1;
+			break;
+		case 'r':
+			init_range(strtol(optarg, NULL, 10));
 			break;
 		case 'v':
 			++verbose;
@@ -213,6 +214,8 @@ int main(int argc, char *argv[])
 			parse_logfile(argv[i], process_log);
 		}
 
+	range_fixup();
+
 #ifdef DOMAINS
 	puts("Domains:");
 	db_walk(domains, print);
@@ -233,37 +236,3 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
-#ifdef RANGE
-static void init_range(int days)
-{
-	time_t now = time(NULL);
-	struct tm *tm = localtime(&now);
-
-	tm->tm_hour = 23;
-	tm->tm_min = 59;
-	tm->tm_sec = 59;
-	--tm->tm_mday;
-	end = mktime(tm);
-
-	tm->tm_hour = 0;
-	tm->tm_min = 0;
-	tm->tm_sec = 0;
-	tm->tm_mday -= days - 1;
-	start = mktime(tm);
-}
-
-static int in_range(struct log *log)
-{
-	if (start == 0)
-		return 1;
-	else if (log->time >= start && log->time <= end) {
-		if (log->time > real_max)
-			real_max = log->time;
-		if (log->time < real_min)
-			real_min = log->time;
-		return 1;
-	} else
-		return 0;
-}
-#endif
