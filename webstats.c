@@ -8,6 +8,7 @@
 /* Visits takes no more time on YOW. */
 static int enable_visits;
 static int width = 422;
+static int offset = 35;
 
 static struct site {
 	char *name;
@@ -321,7 +322,7 @@ static void out_graphs(void)
 		gdImageString(im, gdFontMediumBold, 522, 203,
 			      (unsigned char *)"Visits", color);
 
-	x = 35;
+	x = offset;
 	for (i = 0; i < n_sites; ++i) {
 		color = getcolor(im, sites[i].color);
 		gdImageString(im, gdFontSmall, x, 220,
@@ -550,6 +551,7 @@ int main(int argc, char *argv[])
 		case 'V':
 			enable_visits = 1;
 			width = 642;
+			offset = 150;
 			break;
 		default:
 			puts("Sorry!");
