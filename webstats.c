@@ -5,7 +5,7 @@
 #include <gdfontmb.h>
 #include <gdfonts.h>
 
-#define GOPHER
+/* Visits takes no more time on YOW. */
 #define ENABLE_VISITS
 
 #ifdef ENABLE_VISITS
@@ -37,9 +37,7 @@ struct list {
 
 static int verbose;
 
-#ifdef GOPHER
 static struct list *includes;
-#endif
 static struct list *others;
 
 static unsigned long total_hits;
@@ -113,7 +111,6 @@ static void out_trailer(FILE *fp)
 	fprintf(fp, "\n</body>\n</html>\n");
 }
 
-#ifdef GOPHER
 static void add_include(char *fname, FILE *out)
 {
 	char line[4096], *p;
@@ -170,7 +167,6 @@ static void add_include(char *fname, FILE *out)
 
 	fclose(in);
 }
-#endif
 
 static void out_html(char *fname)
 {
@@ -233,12 +229,10 @@ static void out_html(char *fname)
 
 	fprintf(fp, "</table>\n</center>\n");
 
-#ifdef GOPHER
 	while (includes) {
 		add_include(includes->name, fp);
 		includes = includes->next;
 	}
-#endif
 
 	out_trailer(fp);
 
@@ -311,65 +305,6 @@ static void out_txt(char *fname)
 
 	fclose(fp);
 }
-
-#ifdef GOPHER
-static void out_gopher(char *fname)
-{
-	int i;
-	FILE *fp = fopen(fname, "w");
-	if (!fp) {
-		perror(fname);
-		return;
-	}
-
-	out_header(fp, "Statistics for YOW gopher");
-
-	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=2 "
-		"CELLSPACING=1 CELLPADDING=1");
-	fprintf(fp, " summary=\"Satistics.\">\n");
-
-	fputs("<tr><th>Site"
-	      "<th>Hits"
-	      "<th>Size (M)\n"
-#ifdef ENABLE_VISITS
-	      "<th>Visits\n"
-#endif
-	      , fp);
-
-	for (i = 0; i < n_sites; ++i) {
-		fprintf(fp, "<tr><td>%s"
-			"<td align=right>%d"
-			"<td align=right>%ld"
-#ifdef ENABLE_VISITS
-			"<td align=right>%ld"
-#endif
-			"%s", sites[i].name,
-			sites[i].hits,
-			sites[i].size / 1024,
-#ifdef ENABLE_VISITS
-			sites[i].visits,
-#endif
-			"\n");
-	}
-
-	fprintf(fp, "<tr><td>Totals<td align=right>%ld"
-		"<td align=right>%ld\n"
-#ifdef ENABLE_VISITS
-		"<td align=right>%ld\n"
-#endif
-		, total_hits, total_size / 1024
-#ifdef ENABLE_VISITS
-		, total_visits
-#endif
-		);
-
-	fprintf(fp, "</table>\n");
-
-	out_trailer(fp);
-
-	fclose(fp);
-}
-#endif
 
 static int getcolor(gdImagePtr im, int color)
 {
@@ -619,100 +554,11 @@ static void process_log(struct log *log)
 #endif
 }
 
-#ifdef GOPHER
-static int check_time(struct tm *tm, char *month, time_t *this)
-{
-	static char *months[12] = {
-		"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-	};
-	static time_t start;
-
-	if (start == 0)
-		start = time(NULL) - (31 * 24 * 60 * 60);
-
-	tm->tm_year -= 1900;
-
-	for (tm->tm_mon = 0; tm->tm_mon < 12; ++tm->tm_mon)
-		if (strcmp(months[tm->tm_mon], month) == 0) {
-			*this = mktime(tm);
-			return *this > start;
-		}
-
-	return 0;
-}
-
-
-/* Gopher logfile is more limited. Plus, there is no concept of
- * virtual sites. */
-static void parse_gopher_log(char *logfile)
-{
-	char line[4096], url[4096];
-	int site;
-	int lineno = 0;
-	gzFile fp = gzopen(logfile, "rb");
-	if (!fp) {
-		perror(logfile);
-		exit(1);
-	}
-
-	while (gzgets(fp, line, sizeof(line))) {
-		char ip[20], month[8];
-		int status;
-		unsigned long size;
-		struct tm tm;
-		time_t this;
-
-		++lineno;
-
-		memset(&tm, 0, sizeof(tm));
-		if (sscanf(line,
-			   "%s - - [%d/%[^/]/%d:%d:%d:%d %*d] "
-			   "\"%[^\"]\" %d %lu",
-			   ip,
-			   &tm.tm_mday, month, &tm.tm_year,
-			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
-			   url, &status, &size) != 10) {
-			printf("%d: Error %s", lineno, line);
-			continue;
-		}
-
-		/* Don't count local access. */
-		if (strncmp(ip, "192.168.", 8) == 0)
-			continue;
-
-		if (!check_time(&tm, month, &this))
-			continue;
-
-		if (this > max_date)
-			max_date = this;
-		if (this < min_date)
-			min_date = this;
-
-		site = strstr(url, "HTTP/1.") != NULL;
-
-		++sites[site].hits;
-		sites[site].size += size;
-
-		if (status == 200 && db_put(sites[site].ipdb, ip) == 0) {
-			++sites[site].visits;
-			if (verbose)
-				printf("visit %s\n", ip);
-		}
-	}
-
-	gzclose(fp);
-}
-#endif
-
 int main(int argc, char *argv[])
 {
 	int i;
-#ifdef GOPHER
-	int gopher = 0;
-#endif
 
-	while ((i = getopt(argc, argv, "d:g:o:r:vGI:")) != EOF)
+	while ((i = getopt(argc, argv, "d:g:o:r:vI:")) != EOF)
 		switch (i) {
 		case 'd':
 			outdir = optarg;
@@ -729,17 +575,9 @@ int main(int argc, char *argv[])
 		case 'v':
 			++verbose;
 			break;
-#ifdef GOPHER
-		case 'G':
-			gopher = 1;
-			n_sites = 2;
-			sites[0].name = "Gopher";
-			sites[1].name = "HTTP";
-			break;
 		case 'I':
 			add_list(optarg, &includes);
 			break;
-#endif
 		default:
 			puts("Sorry!");
 			exit(1);
@@ -768,12 +606,7 @@ int main(int argc, char *argv[])
 	for (i = optind; i < argc; ++i) {
 		if (verbose)
 			printf("Parsing %s...\n", argv[i]);
-#ifdef GOPHER
-		if (gopher)
-			parse_gopher_log(argv[i]);
-		else
-#endif
-			parse_logfile(argv[i], process_log);
+		parse_logfile(argv[i], process_log);
 	}
 
 	for (i = 0; i < n_sites; ++i)
@@ -796,16 +629,8 @@ int main(int argc, char *argv[])
 	if (total_size == 0)
 		total_size = 1;
 
-#ifdef GOPHER
-	if (gopher)
-		out_gopher(filename(outfile, NULL));
-	else
-#endif
-	{
-		out_graphs();
-		out_html(filename(outfile, NULL));
-	}
-
+	out_graphs();
+	out_html(filename(outfile, NULL));
 	out_txt(filename(outfile, ".txt"));
 
 	return 0;

@@ -1,8 +1,5 @@
 #include "webstats.h"
 
-static int lineno;
-static int max;
-
 time_t min_date = 0x7fffffff, max_date;
 
 
@@ -37,7 +34,6 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 {
 	struct log log;
 	char line[4096], url[4096], refer[4096], who[4096];
-	int len;
 	gzFile fp = my_fopen(logfile);
 	if (!fp) {
 		perror(logfile);
@@ -54,16 +50,7 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 		unsigned long size;
 		struct tm tm;
 
-		++lineno;
-		len = strlen(line);
-		if (len > max) {
-			max = len;
-			if (len == sizeof(line) - 1) {
-				printf("PROBLEMS 0\n");
-				gzgets(fp, line, sizeof(line));
-				continue;
-			}
-		}
+		++log.lineno;
 
 		/* Don't count local access. */
 		if (strncmp(line, "192.168.", 8) == 0)
@@ -88,11 +75,11 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 				   &tm.tm_mday, month, &tm.tm_year,
 				   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
 				   &status, sstr, &where) != 10) {
-				printf("%d: Error [8] %s", lineno, line);
+				printf("%d: Error [8] %s", log.lineno, line);
 				continue;
 			}
 		} else if (n != 12) {
-			printf("%d: Error [%d] %s", lineno, n, line);
+			printf("%d: Error [%d] %s", log.lineno, n, line);
 			continue;
 		}
 
@@ -106,7 +93,7 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 		while (e && *(e + 1) != ' ')
 			e = strchr(e + 1, '"');
 		if (!e) {
-			printf("%d: Error %s", lineno, line);
+			printf("%d: Error %s", log.lineno, line);
 			continue;
 		}
 
@@ -118,7 +105,6 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 
 		log.time = parse_date(&tm, month);
 
-		log.lineno = lineno;
 		log.ip = ip;
 		log.host = host;
 		log.tm = &tm;
@@ -134,6 +120,55 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 	}
 
 	my_fclose(fp);
+}
+
+/* Gopher logfile is more limited. Plus, there is no concept of
+ * virtual sites. */
+void parse_gopher_log(char *logfile, void (*func)(struct log *log))
+{
+	char line[4096], url[4096];
+	struct log log;
+	gzFile fp = gzopen(logfile, "rb");
+	if (!fp) {
+		perror(logfile);
+		exit(1);
+	}
+
+	memset(&log, 0, sizeof(log));
+
+	while (gzgets(fp, line, sizeof(line))) {
+		char ip[20], month[8];
+		int status;
+		unsigned long size;
+		struct tm tm;
+
+		++log.lineno;
+
+		memset(&tm, 0, sizeof(tm));
+		if (sscanf(line,
+			   "%s - - [%d/%[^/]/%d:%d:%d:%d %*d] "
+			   "\"%[^\"]\" %d %lu",
+			   ip,
+			   &tm.tm_mday, month, &tm.tm_year,
+			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
+			   url, &status, &size) != 10) {
+			printf("%d: Error %s", log.lineno, line);
+			continue;
+		}
+
+		log.time = parse_date(&tm, month);
+
+		log.ip = ip;
+		log.tm = &tm;
+		log.url = url;
+		log.status = status;
+		log.size = size;
+
+		if (func)
+			(*func)(&log);
+	}
+
+	gzclose(fp);
 }
 
 static char *months[12] = {
