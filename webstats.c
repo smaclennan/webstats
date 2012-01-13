@@ -262,8 +262,9 @@ static void out_txt(char *fname)
 			(double)sites[i].size * 100.0 / (double)total_size);
 		if (enable_visits)
 			fprintf(fp, "\t%6ld  %3.1f%%",
-			sites[i].visits,
-				(double)sites[i].visits * 100.0 / (double)total_visits);
+				sites[i].visits,
+				(double)sites[i].visits * 100.0 /
+				(double)total_visits);
 		fputs("\n", fp);
 	}
 
