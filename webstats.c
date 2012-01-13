@@ -6,13 +6,8 @@
 #include <gdfonts.h>
 
 /* Visits takes no more time on YOW. */
-#define ENABLE_VISITS
-
-#ifdef ENABLE_VISITS
-#define WIDTH 642
-#else
-#define WIDTH 422
-#endif
+static int enable_visits;
+static int width = 422;
 
 static struct site {
 	char *name;
@@ -181,51 +176,40 @@ static void out_html(char *fname)
 
 	fprintf(fp, "<p><img src=\"pie.gif\" width=%d height=235 "
 		"alt=\"Pie Charts\">\n\n",
-		WIDTH);
+		width);
 
 	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=2 "
 		"CELLSPACING=1 CELLPADDING=1");
 	fprintf(fp, " summary=\"Satistics.\">\n");
 
-	fputs("<tr><th>Site"
-	      "<th colspan=2>Hits"
-	      "<th colspan=2>Size (M)\n"
-#ifdef ENABLE_VISITS
-	      "<th colspan=2>Visits\n"
-#endif
-	      , fp);
+	fputs("<tr><th>Site<th colspan=2>Hits<th colspan=2>Size (M)\n", fp);
+	if (enable_visits)
+		fputs("<th colspan=2>Visits\n", fp);
 
 	for (i = 0; i < n_sites; ++i) {
 		if (sites[i].hits == 0)
 			continue;
 		fprintf(fp, "<tr><td>%s"
 			"<td align=right>%d<td align=right>%.1f%%"
-			"<td align=right>%.1f<td align=right>%.1f%%"
-#ifdef ENABLE_VISITS
-			"<td align=right>%ld<td align=right>%.1f%%"
-#endif
-			"%s", sites[i].name,
+			"<td align=right>%.1f<td align=right>%.1f%%",
+			sites[i].name,
 			sites[i].hits,
 			(double)sites[i].hits * 100.0 / (double)total_hits,
 			(double)sites[i].size / 1024.0,
-			(double)sites[i].size * 100.0 / (double)total_size,
-#ifdef ENABLE_VISITS
-			sites[i].visits,
-			(double)sites[i].visits * 100.0 / (double)total_visits,
-#endif
-			"\n");
+			(double)sites[i].size * 100.0 / (double)total_size);
+		if (enable_visits)
+			fprintf(fp, "<td align=right>%ld<td align=right>%.1f%%",
+				sites[i].visits,
+				(double)sites[i].visits * 100.0 /
+				(double)total_visits);
+		fputs("\n", fp);
 	}
 
 	fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;"
-		"<td align=right>%ld<td>&nbsp;\n"
-#ifdef ENABLE_VISITS
-		"<td align=right>%ld<td>&nbsp;\n"
-#endif
-		, total_hits, total_size / 1024
-#ifdef ENABLE_VISITS
-		, total_visits
-#endif
-		);
+		"<td align=right>%ld<td>&nbsp;\n",
+		total_hits, total_size / 1024);
+	if (enable_visits)
+		fprintf(fp, "<td align=right>%ld<td>&nbsp;\n", total_visits);
 
 	fprintf(fp, "</table>\n</center>\n");
 
@@ -242,9 +226,8 @@ static void out_html(char *fname)
 static void out_hr(FILE *fp)
 {
 	fputs("-----------------------------------------------------", fp);
-#ifdef ENABLE_VISITS
-	fputs("----------------", fp);
-#endif
+	if (enable_visits)
+		fputs("----------------", fp);
 	fputs("\n", fp);
 }
 
@@ -262,46 +245,33 @@ static void out_txt(char *fname)
 	fprintf(fp, " to %s (%d days)\n", cur_date(max_date), days());
 	fprintf(fp, "Generated %s\n\n", cur_time(time(NULL)));
 
-#ifdef ENABLE_VISITS
-	fputs("Site\t\t\t Hits\t\t     Size\t    Visits\n", fp);
-#else
-	fputs("Site\t\t\t Hits\t\t     Size\n", fp);
-#endif
+	if (enable_visits)
+		fputs("Site\t\t\t Hits\t\t     Size\t    Visits\n", fp);
+	else
+		fputs("Site\t\t\t Hits\t\t     Size\n", fp);
 	out_hr(fp);
 
 	for (i = 0; i < n_sites; ++i) {
 		if (sites[i].hits == 0)
 			continue;
-		fprintf(fp, "%-20s"
-			"%6d  %3.1f%%"
-			"\t%6ld  %3.1f%%"
-#ifdef ENABLE_VISITS
-			"\t%6ld  %3.1f%%"
-#endif
-			"\n", sites[i].name,
-			sites[i].hits,
+		fprintf(fp, "%-20s%6d  %3.1f%%\t%6ld  %3.1f%%",
+			sites[i].name, sites[i].hits,
 			(double)sites[i].hits * 100.0 / (double)total_hits,
 			sites[i].size / 1024,
-			(double)sites[i].size * 100.0 / (double)total_size
-#ifdef ENABLE_VISITS
-			,
+			(double)sites[i].size * 100.0 / (double)total_size);
+		if (enable_visits)
+			fprintf(fp, "\t%6ld  %3.1f%%",
 			sites[i].visits,
-			(double)sites[i].visits * 100.0 / (double)total_visits
-#endif
-			);
+				(double)sites[i].visits * 100.0 / (double)total_visits);
+		fputs("\n", fp);
 	}
 
 	out_hr(fp);
-	fprintf(fp, "%-20s%6ld      \t"
-		"%6ld      \t"
-#ifdef ENABLE_VISITS
-		"%6ld"
-#endif
-		"\n", "Totals", total_hits, total_size / 1024
-#ifdef ENABLE_VISITS
-		, total_visits
-#endif
-		);
+	fprintf(fp, "%-20s%6ld      \t%6ld",
+		"Totals", total_hits, total_size / 1024);
+	if (enable_visits)
+		fprintf(fp, "      \t%6ld", total_visits);
+	fputs("\n", fp);
 
 	fclose(fp);
 }
@@ -337,7 +307,7 @@ static void out_graphs(void)
 	int i, tarc, color;
 	int x;
 
-	gdImagePtr im = gdImageCreate(WIDTH, 235);
+	gdImagePtr im = gdImageCreate(width, 235);
 	color = gdImageColorAllocate(im, 0xff, 0xff, 0xff); /* background */
 	gdImageColorTransparent(im, color);
 
@@ -347,10 +317,9 @@ static void out_graphs(void)
 		      (unsigned char *)"Hits", color);
 	gdImageString(im, gdFontMediumBold, 305, 203,
 		      (unsigned char *)"Bytes", color);
-#ifdef ENABLE_VISITS
-	gdImageString(im, gdFontMediumBold, 522, 203,
-		      (unsigned char *)"Visits", color);
-#endif
+	if (enable_visits)
+		gdImageString(im, gdFontMediumBold, 522, 203,
+			      (unsigned char *)"Visits", color);
 
 	x = 35;
 	for (i = 0; i < n_sites; ++i) {
@@ -397,26 +366,26 @@ static void out_graphs(void)
 
 	draw_pie(im, 320, 100, 198);
 
-#ifdef ENABLE_VISITS
-	/* Calculate the visit arcs */
-	for (tarc = i = 0; i < n_sites; ++i) {
-		sites[i].arc = sites[i].visits * 360 / total_visits;
-		tarc += sites[i].arc;
+	if (enable_visits) {
+		/* Calculate the visit arcs */
+		for (tarc = i = 0; i < n_sites; ++i) {
+			sites[i].arc = sites[i].visits * 360 / total_visits;
+			tarc += sites[i].arc;
 
 #if 0
-		printf("%s %ld %ld%% %ld\n",
-		       sites[i].name,
-		       sites[i].size,
-		       sites[i].size * 100 / total_size,
-		       sites[i].arc);
+			printf("%s %ld %ld%% %ld\n",
+			       sites[i].name,
+			       sites[i].size,
+			       sites[i].size * 100 / total_size,
+			       sites[i].arc);
 #endif
+		}
+
+		/* Compensate the first arc */
+		sites[0].arc += 360 - tarc;
+
+		draw_pie(im, 540, 100, 198);
 	}
-
-	/* Compensate the first arc */
-	sites[0].arc += 360 - tarc;
-
-	draw_pie(im, 540, 100, 198);
-#endif
 
 	/* Save to file. */
 	fname = filename(outgraph, NULL);
@@ -558,7 +527,7 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "d:g:o:r:vI:")) != EOF)
+	while ((i = getopt(argc, argv, "d:g:o:r:vI:V")) != EOF)
 		switch (i) {
 		case 'd':
 			outdir = optarg;
@@ -577,6 +546,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'I':
 			add_list(optarg, &includes);
+			break;
+		case 'V':
+			enable_visits = 1;
+			width = 642;
 			break;
 		default:
 			puts("Sorry!");
