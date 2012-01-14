@@ -212,10 +212,10 @@ static void out_html(char *fname)
 	}
 
 	fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;"
-		"<td align=right>%ld<td>&nbsp;\n",
+		"<td align=right>%ld<td>&nbsp;",
 		total_hits, total_pages);
 	if (enable_visits)
-		fprintf(fp, "<td align=right>%ld<td>&nbsp;\n", total_visits);
+		fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_visits);
 	fprintf(fp, "<td align=right>%ld<td>&nbsp;\n", total_size / 1024);
 
 	fprintf(fp, "</table>\n</center>\n");
