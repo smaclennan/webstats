@@ -1,14 +1,13 @@
 #  Bots/Spiders/Crawlers
-findlinks
-BPImageWalker
-SBIder/Nutch
-Ocelli
-ZmEu
-panscient.com
+Googlebot
+FAST-WebCrawler
 Jeeves
 ia_archiver
+ArchitextSpider
+Openbot
 Slurp
 Scooter
+scooter
 cosmos
 Netcraft Web Server Survey
 larbin
@@ -16,8 +15,11 @@ http://www.almaden.ibm.com/
 Mercator
 moget
 ZyBorg
+LexiBot
 ipium
+IPiumBot
 gazz
+psbot
 ScoutAbout
 bumblebee@relevare
 # spam tool
@@ -29,8 +31,3 @@ Robozilla
 # Web page validators
 W3C_Validator
 W3C_CSS_Validator
-Yanga
-ScoutJet
-Twiceler
-yandex
-searchme.com
