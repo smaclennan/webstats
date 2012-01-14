@@ -14,6 +14,7 @@ static struct site {
 	char *name;
 	int color;
 	int hits;
+	int pages;
 	unsigned long size;
 	unsigned long arc;
 	DB *ipdb;
@@ -37,6 +38,7 @@ static struct list *includes;
 static struct list *others;
 
 static unsigned long total_hits;
+static unsigned long total_pages;
 static unsigned long total_size;
 static unsigned long total_visits;
 
@@ -179,38 +181,42 @@ static void out_html(char *fname)
 		"alt=\"Pie Charts\">\n\n",
 		width);
 
-	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=2 "
+	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=1 "
 		"CELLSPACING=1 CELLPADDING=1");
 	fprintf(fp, " summary=\"Satistics.\">\n");
 
-	fputs("<tr><th>Site<th colspan=2>Hits<th colspan=2>Size (M)\n", fp);
+	fputs("<tr><th>Site<th colspan=2>Hits<th colspan=2>Pages", fp);
 	if (enable_visits)
-		fputs("<th colspan=2>Visits\n", fp);
+		fputs("<th colspan=2>Visits", fp);
+	fputs("<th colspan=2>Size (M)\n", fp);
 
 	for (i = 0; i < n_sites; ++i) {
 		if (sites[i].hits == 0)
 			continue;
 		fprintf(fp, "<tr><td>%s"
 			"<td align=right>%d<td align=right>%.1f%%"
-			"<td align=right>%.1f<td align=right>%.1f%%",
+			"<td align=right>%d<td align=right>%.1f%%",
 			sites[i].name,
 			sites[i].hits,
 			(double)sites[i].hits * 100.0 / (double)total_hits,
-			(double)sites[i].size / 1024.0,
-			(double)sites[i].size * 100.0 / (double)total_size);
+			sites[i].pages,
+			(double)sites[i].pages * 100.0 / (double)total_pages);
 		if (enable_visits)
 			fprintf(fp, "<td align=right>%ld<td align=right>%.1f%%",
 				sites[i].visits,
 				(double)sites[i].visits * 100.0 /
 				(double)total_visits);
-		fputs("\n", fp);
+		fprintf(fp, "<td align=right>%.1f<td align=right>%.1f%%\n",
+			(double)sites[i].size / 1024.0,
+			(double)sites[i].size * 100.0 / (double)total_size);
 	}
 
 	fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;"
 		"<td align=right>%ld<td>&nbsp;\n",
-		total_hits, total_size / 1024);
+		total_hits, total_pages);
 	if (enable_visits)
 		fprintf(fp, "<td align=right>%ld<td>&nbsp;\n", total_visits);
+	fprintf(fp, "<td align=right>%ld<td>&nbsp;\n", total_size / 1024);
 
 	fprintf(fp, "</table>\n</center>\n");
 
@@ -468,16 +474,17 @@ static int ispage(char *url)
 	return 0;
 }
 
-static void update_site(int i, struct log *log)
+static void update_site(struct site *site, struct log *log, int whence)
 {
-	++sites[i].hits;
-	sites[i].size += log->size;
+	++site->hits;
+	site->size += log->size;
 
 	if (log->status == 200 && ispage(log->url) && isbrowser(log->who)) {
-		if (db_put(sites[i].ipdb, log->ip) == 0) {
-			++sites[i].visits;
+		++site->pages;
+		if (db_put(site->ipdb, log->ip) == 0) {
+			++site->visits;
 			if (verbose)
-				printf("%s: %s\n", sites[i].name, log->ip);
+				printf("%s: %s\n", site->name, log->ip);
 		}
 	}
 }
@@ -492,24 +499,24 @@ static void process_log(struct log *log)
 
 	/* Unqualified lines */
 	if (*log->host == '-') {
-		update_site(0, log);
+		update_site(&sites[0], log, 0);
 		return;
 	}
 
 	for (i = 1; i < n_sites; ++i)
 		if (strstr(log->host, sites[i].name)) {
-			update_site(i, log);
+			update_site(&sites[i], log, 1);
 			return;
 		}
 
 	if (strcmp(log->host, "yow") == 0 ||
 	    strcmp(log->host, "localhost") == 0 ||
-	    strcmp(log->host, "192.168.0.1") == 0 ||
+	    strncmp(log->host, "192.168.", 8) == 0 ||
 	    strcmp(log->host, "127.0.0.1") == 0)
 		return; /* don't count locals */
 
 	/* lighttpd defaults to seanm.ca for everything else */
-	update_site(0, log);
+	update_site(&sites[0], log, 2);
 
 #if 1
 	if (strstr(log->host, "seanm.ca") == NULL) {
@@ -593,6 +600,7 @@ int main(int argc, char *argv[])
 	/* Calculate the totals */
 	for (i = 0; i < n_sites; ++i) {
 		total_hits += sites[i].hits;
+		total_pages += sites[i].pages;
 		total_visits += sites[i].visits;
 		sites[i].size /= 1024; /* convert to k */
 		total_size += sites[i].size;
@@ -611,4 +619,3 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
