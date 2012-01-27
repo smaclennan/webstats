@@ -68,7 +68,7 @@ static int is_page(char *url)
 }
 #endif
 
-#if 0
+#if 1
 /* Probably only of use to me ;) */
 static int is_seanm_ca(char *host)
 {
@@ -98,6 +98,7 @@ static void process_log(struct log *log)
 #endif
 #ifdef PAGES
 	if (log->status == 200) { /* only worry about real files */
+		char url[256], *host;
 		int len = strlen(log->url);
 		char *p = strstr(log->url, "index.htm");
 		if (p)
@@ -117,7 +118,15 @@ static void process_log(struct log *log)
 		else
 			strcpy(log->url, "/");
 #endif
-		db_update_count(pages, log->url, log->size);
+
+		host = log->host;
+		if (is_seanm_ca(host))
+			host = "seanm.ca";
+		else if (strncmp(host, "www.", 4) == 0)
+			host += 4;
+
+		snprintf(url, sizeof(url), "%s%s", host, log->url);
+		db_update_count(pages, url, log->size);
 	}
 #endif
 }
