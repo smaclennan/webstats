@@ -8,9 +8,9 @@ static char *outdir;
 static char *outfile;
 
 /*
-#define PAGES
 #define DOMAINS
  */
+#define PAGES
 #ifdef DOMAINS
 DB *domains;
 #endif
@@ -85,6 +85,11 @@ static int is_seanm_ca(char *host)
 
 static void process_log(struct log *log)
 {
+#if 0
+	if (strcmp(log->host, "ftp.seanm.ca"))
+		return;
+#endif
+
 	if (!in_range(log))
 		return;
 
@@ -101,6 +106,17 @@ static void process_log(struct log *log)
 		if (len > max_url)
 			max_url = len;
 
+#if 0
+		/* By directory */
+		p = log->url;
+		if (*p == '/')
+			++p;
+		p = strchr(p, '/');
+		if (p)
+			*p = '\0';
+		else
+			strcpy(log->url, "/");
+#endif
 		db_update_count(pages, log->url, log->size);
 	}
 #endif
