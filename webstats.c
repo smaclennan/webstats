@@ -5,6 +5,8 @@
 #include <gdfontmb.h>
 #include <gdfonts.h>
 
+#define TOP_TEN 10
+
 /* Visits takes no more time on YOW. */
 static int enable_visits;
 static int width = 422;
@@ -46,6 +48,18 @@ static char *outdir;
 static char *outfile = "stats.html";
 static char *outgraph = "pie.gif";
 
+#ifdef TOP_TEN
+DB *pages;
+static int max_url;
+
+static struct {
+	char *name;
+	unsigned long size;
+} top[TOP_TEN];
+int n_top;
+
+#define m(n)   (((double)(n)) / 1024.0 / 1024.0)
+#endif
 
 /* filename mallocs space, you should free it */
 static char *filename(char *fname, char *ext)
@@ -106,7 +120,7 @@ static void out_header(FILE *fp, char *title)
 static void out_trailer(FILE *fp)
 {
 	/* trailer */
-	fprintf(fp, "\n</body>\n</html>\n");
+	fprintf(fp, "\n</center>\n</body>\n</html>\n");
 }
 
 static void add_include(char *fname, FILE *out)
@@ -218,12 +232,25 @@ static void out_html(char *fname)
 		fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_visits);
 	fprintf(fp, "<td align=right>%ld<td>&nbsp;\n", total_size / 1024);
 
-	fprintf(fp, "</table>\n</center>\n");
+	fprintf(fp, "</table>\n");
 
 	while (includes) {
 		add_include(includes->name, fp);
 		includes = includes->next;
 	}
+
+#ifdef TOP_TEN
+	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=1 "
+		"CELLSPACING=1 CELLPADDING=1 Summary=\"Top Ten\">");
+	fprintf(fp, "<th colspan=2>Top Ten</th>\n");
+
+	for (i = 0; i < n_top; ++i) {
+		double size = m(top[i].size);
+		fprintf(fp, "<tr><td>%s<td align=right>%.1f\n", top[i].name, size);
+	}
+
+	fprintf(fp, "</table>\n");
+#endif
 
 	out_trailer(fp);
 
@@ -487,6 +514,16 @@ static void update_site(struct site *site, struct log *log, int whence)
 				printf("%s: %s\n", site->name, log->ip);
 		}
 	}
+
+#ifdef TOP_TEN
+	char url[256];
+	int len;
+
+	len = snprintf(url, sizeof(url), "%s%s", site->name, log->url);
+	if (len > max_url)
+		max_url = len;
+	db_update_count(pages, url, log->size);
+#endif
 }
 
 static void process_log(struct log *log)
@@ -531,6 +568,47 @@ static void process_log(struct log *log)
 	}
 #endif
 }
+
+#ifdef TOP_TEN
+static void setup_sort(void)
+{
+	int i;
+
+	++max_url; /* Room for NULL */
+	for (i = 0; i < TOP_TEN; ++i) {
+		top[i].name = calloc(1, max_url);
+		if (!top[i].name) {
+			printf("Out of memory\n");
+			exit(1);
+		}
+	}
+}
+
+static void sort_pages(char *key, void *data, int len)
+{
+	int i, j;
+	unsigned long size = *(unsigned long *)data;
+
+	for (i = 0; i < n_top; ++i)
+		if (size > top[i].size) {
+			for (j = n_top - 1; j > i; --j) {
+				strcpy(top[j].name, top[j - 1].name);
+				top[j].size = top[j - 1].size;
+			}
+			strcpy(top[i].name, key);
+			top[i].size = size;
+			if (n_top < TOP_TEN)
+				++n_top;
+			return;
+		}
+
+	if (n_top < TOP_TEN) {
+		strcpy(top[n_top].name, key);
+		top[n_top].size = size;
+		++n_top;
+	}
+}
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -578,6 +656,12 @@ int main(int argc, char *argv[])
 	add_others("toronto-hs-216-138-233-67.s-ip.magma.ca");
 	add_others("m38a1.ca");
 
+#ifdef TOP_TEN
+	pages = db_open("pages");
+	if (!pages)
+		exit(1);
+#endif
+
 	for (i = 0; i < n_sites; ++i) {
 		sites[i].ipdb = db_open(sites[i].name);
 		if (!sites[i].ipdb) {
@@ -596,6 +680,11 @@ int main(int argc, char *argv[])
 		db_close(sites[i].name, sites[i].ipdb);
 
 	range_fixup();
+
+#ifdef TOP_TEN
+	setup_sort();
+	db_walk(pages, sort_pages);
+#endif
 
 	/* Calculate the totals */
 	for (i = 0; i < n_sites; ++i) {
