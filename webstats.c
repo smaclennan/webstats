@@ -9,6 +9,7 @@
 
 /* Visits takes no more time on YOW. */
 static int enable_visits;
+static int enable_pages;
 static int width = 422;
 static int offset = 35;
 
@@ -195,11 +196,14 @@ static void out_html(char *fname)
 		"alt=\"Pie Charts\">\n\n",
 		width);
 
-	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=1 "
-		"CELLSPACING=1 CELLPADDING=1");
+	fprintf(fp, "<p><table WIDTH=\"%d%%\" BORDER=1 "
+		"CELLSPACING=1 CELLPADDING=1",
+		enable_pages ? 80 : 60);
 	fprintf(fp, " summary=\"Satistics.\">\n");
 
-	fputs("<tr><th>Site<th colspan=2>Hits<th colspan=2>Pages", fp);
+	fputs("<tr><th>Site<th colspan=2>Hits", fp);
+	if (enable_pages)
+		fputs("<th colspan=2>Pages", fp);
 	if (enable_visits)
 		fputs("<th colspan=2>Visits", fp);
 	fputs("<th colspan=2>Size (M)\n", fp);
@@ -208,13 +212,14 @@ static void out_html(char *fname)
 		if (sites[i].hits == 0)
 			continue;
 		fprintf(fp, "<tr><td>%s"
-			"<td align=right>%d<td align=right>%.1f%%"
 			"<td align=right>%d<td align=right>%.1f%%",
 			sites[i].name,
 			sites[i].hits,
-			(double)sites[i].hits * 100.0 / (double)total_hits,
-			sites[i].pages,
-			(double)sites[i].pages * 100.0 / (double)total_pages);
+			(double)sites[i].hits * 100.0 / (double)total_hits);
+		if (enable_pages)
+			fprintf(fp, "<td align=right>%d<td align=right>%.1f%%",
+				sites[i].pages,
+				(double)sites[i].pages * 100.0 / (double)total_pages);
 		if (enable_visits)
 			fprintf(fp, "<td align=right>%ld<td align=right>%.1f%%",
 				sites[i].visits,
@@ -225,9 +230,9 @@ static void out_html(char *fname)
 			(double)sites[i].size * 100.0 / (double)total_size);
 	}
 
-	fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;"
-		"<td align=right>%ld<td>&nbsp;",
-		total_hits, total_pages);
+	fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", total_hits);
+	if (enable_pages)
+		fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_pages);
 	if (enable_visits)
 		fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_visits);
 	fprintf(fp, "<td align=right>%ld<td>&nbsp;\n", total_size / 1024);
@@ -240,8 +245,9 @@ static void out_html(char *fname)
 	}
 
 #ifdef TOP_TEN
-	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=1 "
-		"CELLSPACING=1 CELLPADDING=1 Summary=\"Top Ten\">");
+	fprintf(fp, "<p><table WIDTH=\"%d%%\" BORDER=1 "
+		"CELLSPACING=1 CELLPADDING=1 Summary=\"Top Ten\">",
+		enable_pages ? 80 : 60);
 	fprintf(fp, "<th colspan=2>Top Ten</th>\n");
 
 	for (i = 0; i < n_top; ++i) {
@@ -279,34 +285,22 @@ static void out_txt(char *fname)
 	fprintf(fp, " to %s (%d days)\n", cur_date(max_date), days());
 	fprintf(fp, "Generated %s\n\n", cur_time(time(NULL)));
 
-	if (enable_visits)
-		fputs("Site\t\t\t Hits\t\t     Size\t    Visits\n", fp);
-	else
-		fputs("Site\t\t\t Hits\t\t     Size\n", fp);
+	fputs("Site\t\t\t Hits\t\t     Size\n", fp);
 	out_hr(fp);
 
 	for (i = 0; i < n_sites; ++i) {
 		if (sites[i].hits == 0)
 			continue;
-		fprintf(fp, "%-20s%6d  %3.1f%%\t%6ld  %3.1f%%",
+		fprintf(fp, "%-20s%6d  %3.1f%%\t%6ld  %3.1f%%\n",
 			sites[i].name, sites[i].hits,
 			(double)sites[i].hits * 100.0 / (double)total_hits,
 			sites[i].size / 1024,
 			(double)sites[i].size * 100.0 / (double)total_size);
-		if (enable_visits)
-			fprintf(fp, "\t%6ld  %3.1f%%",
-				sites[i].visits,
-				(double)sites[i].visits * 100.0 /
-				(double)total_visits);
-		fputs("\n", fp);
 	}
 
 	out_hr(fp);
-	fprintf(fp, "%-20s%6ld      \t%6ld",
+	fprintf(fp, "%-20s%6ld      \t%6ld\n",
 		"Totals", total_hits, total_size / 1024);
-	if (enable_visits)
-		fprintf(fp, "      \t%6ld", total_visits);
-	fputs("\n", fp);
 
 	fclose(fp);
 }
@@ -399,7 +393,7 @@ static void out_graphs(void)
 		sites[0].arc += 360 - tarc;
 
 		draw_pie(im, 540, 100, 198);
-	} else {
+	} else if (enable_pages) {
 		/* Calculate the pages arcs */
 		for (tarc = i = 0; i < n_sites; ++i) {
 			sites[i].arc = sites[i].pages * 360 / total_pages;
@@ -496,18 +490,25 @@ static void update_site(struct site *site, struct log *log, int whence)
 	++site->hits;
 	site->size += log->size;
 
-	if (log->status == 200 && ispage(log->url) && isbrowser(log->who)) {
-		++site->pages;
-		if (db_put(site->ipdb, log->ip) == 0) {
-			++site->visits;
-			if (verbose)
-				printf("%s: %s\n", site->name, log->ip);
+	if (enable_pages || enable_visits)
+		if (log->status == 200 && ispage(log->url) && isbrowser(log->who)) {
+			++site->pages;
+			if (enable_visits && db_put(site->ipdb, log->ip) == 0) {
+				++site->visits;
+				if (verbose)
+					printf("%s: %s\n", site->name, log->ip);
+			}
 		}
-	}
 
 #ifdef TOP_TEN
 	char url[256];
 	int len;
+
+#if 1
+	/* Ignore rippers.ca */
+	if (strcmp(site->name, "rippers.ca") == 0)
+		return;
+#endif
 
 	len = snprintf(url, sizeof(url), "%s%s", site->name, log->url);
 	if (len > max_url)
@@ -615,6 +616,11 @@ int main(int argc, char *argv[])
 		case 'o':
 			outfile = optarg;
 			break;
+		case 'p':
+			enable_pages = 1;
+			width = 642;
+			offset = 150;
+			break;
 		case 'r':
 			init_range(strtol(optarg, NULL, 10));
 			break;
@@ -652,18 +658,14 @@ int main(int argc, char *argv[])
 		exit(1);
 #endif
 
-	if (!enable_visits) {
-		width = 642;
-		offset = 150;
-	}
-
-	for (i = 0; i < n_sites; ++i) {
-		sites[i].ipdb = db_open(sites[i].name);
-		if (!sites[i].ipdb) {
-			printf("Unable to open db\n");
-			exit(1);
+	if (enable_visits)
+		for (i = 0; i < n_sites; ++i) {
+			sites[i].ipdb = db_open(sites[i].name);
+			if (!sites[i].ipdb) {
+				printf("Unable to open db\n");
+				exit(1);
+			}
 		}
-	}
 
 	for (i = optind; i < argc; ++i) {
 		if (verbose)
@@ -671,8 +673,9 @@ int main(int argc, char *argv[])
 		parse_logfile(argv[i], process_log);
 	}
 
-	for (i = 0; i < n_sites; ++i)
-		db_close(sites[i].name, sites[i].ipdb);
+	if (enable_visits)
+		for (i = 0; i < n_sites; ++i)
+			db_close(sites[i].name, sites[i].ipdb);
 
 	range_fixup();
 
