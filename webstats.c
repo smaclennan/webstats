@@ -355,6 +355,9 @@ static void out_graphs(void)
 	if (enable_visits)
 		gdImageString(im, gdFontMediumBold, 522, 203,
 			      (unsigned char *)"Visits", color);
+	else
+		gdImageString(im, gdFontMediumBold, 522, 203,
+			      (unsigned char *)"Pages", color);
 
 	x = offset;
 	for (i = 0; i < n_sites; ++i) {
@@ -367,14 +370,6 @@ static void out_graphs(void)
 	for (tarc = i = 0; i < n_sites; ++i) {
 		sites[i].arc = sites[i].hits * 360 / total_hits;
 		tarc += sites[i].arc;
-
-#if 0
-		printf("%s %d %ld%% %ld\n",
-		       sites[i].name,
-		       sites[i].hits,
-		       sites[i].hits * 100 / total_hits,
-		       sites[i].arc);
-#endif
 	}
 
 	/* Compensate the first arc */
@@ -386,14 +381,6 @@ static void out_graphs(void)
 	for (tarc = i = 0; i < n_sites; ++i) {
 		sites[i].arc = sites[i].size * 360 / total_size;
 		tarc += sites[i].arc;
-
-#if 0
-		printf("%s %ld %ld%% %ld\n",
-		       sites[i].name,
-		       sites[i].size,
-		       sites[i].size * 100 / total_size,
-		       sites[i].arc);
-#endif
 	}
 
 	/* Compensate the first arc */
@@ -406,14 +393,17 @@ static void out_graphs(void)
 		for (tarc = i = 0; i < n_sites; ++i) {
 			sites[i].arc = sites[i].visits * 360 / total_visits;
 			tarc += sites[i].arc;
+		}
 
-#if 0
-			printf("%s %ld %ld%% %ld\n",
-			       sites[i].name,
-			       sites[i].size,
-			       sites[i].size * 100 / total_size,
-			       sites[i].arc);
-#endif
+		/* Compensate the first arc */
+		sites[0].arc += 360 - tarc;
+
+		draw_pie(im, 540, 100, 198);
+	} else {
+		/* Calculate the pages arcs */
+		for (tarc = i = 0; i < n_sites; ++i) {
+			sites[i].arc = sites[i].pages * 360 / total_pages;
+			tarc += sites[i].arc;
 		}
 
 		/* Compensate the first arc */
@@ -661,6 +651,11 @@ int main(int argc, char *argv[])
 	if (!pages)
 		exit(1);
 #endif
+
+	if (!enable_visits) {
+		width = 642;
+		offset = 150;
+	}
 
 	for (i = 0; i < n_sites; ++i) {
 		sites[i].ipdb = db_open(sites[i].name);
