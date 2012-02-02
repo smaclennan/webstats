@@ -10,6 +10,7 @@
 /* Visits takes no more time on YOW. */
 static int enable_visits;
 static int enable_pages;
+static int enable_topten;
 static int width = 422;
 static int offset = 35;
 
@@ -49,7 +50,6 @@ static char *outdir;
 static char *outfile = "stats.html";
 static char *outgraph = "pie.gif";
 
-#ifdef TOP_TEN
 DB *pages;
 static int max_url;
 
@@ -60,7 +60,6 @@ static struct {
 int n_top;
 
 #define m(n)   (((double)(n)) / 1024.0 / 1024.0)
-#endif
 
 /* filename mallocs space, you should free it */
 static char *filename(char *fname, char *ext)
@@ -244,19 +243,19 @@ static void out_html(char *fname)
 		includes = includes->next;
 	}
 
-#ifdef TOP_TEN
-	fprintf(fp, "<p><table WIDTH=\"%d%%\" BORDER=1 "
-		"CELLSPACING=1 CELLPADDING=1 Summary=\"Top Ten\">",
-		enable_pages ? 80 : 60);
-	fprintf(fp, "<th colspan=2>Top Ten</th>\n");
+	if (enable_topten) {
+		fprintf(fp, "<p><table WIDTH=\"%d%%\" BORDER=1 "
+			"CELLSPACING=1 CELLPADDING=1 Summary=\"Top Ten\">",
+			enable_pages ? 80 : 60);
+		fprintf(fp, "<th colspan=2>Top Ten</th>\n");
 
-	for (i = 0; i < n_top; ++i) {
-		double size = m(top[i].size);
-		fprintf(fp, "<tr><td>%s<td align=right>%.1f\n", top[i].name, size);
+		for (i = 0; i < n_top; ++i) {
+			double size = m(top[i].size);
+			fprintf(fp, "<tr><td>%s<td align=right>%.1f\n", top[i].name, size);
+		}
+
+		fprintf(fp, "</table>\n");
 	}
-
-	fprintf(fp, "</table>\n");
-#endif
 
 	out_trailer(fp);
 
@@ -500,21 +499,21 @@ static void update_site(struct site *site, struct log *log, int whence)
 			}
 		}
 
-#ifdef TOP_TEN
-	char url[256];
-	int len;
+	if (enable_topten) {
+		char url[256];
+		int len;
 
 #if 1
-	/* Ignore rippers.ca */
-	if (strcmp(site->name, "rippers.ca") == 0)
-		return;
+		/* Ignore rippers.ca */
+		if (strcmp(site->name, "rippers.ca") == 0)
+			return;
 #endif
 
-	len = snprintf(url, sizeof(url), "%s%s", site->name, log->url);
-	if (len > max_url)
-		max_url = len;
-	db_update_count(pages, url, log->size);
-#endif
+		len = snprintf(url, sizeof(url), "%s%s", site->name, log->url);
+		if (len > max_url)
+			max_url = len;
+		db_update_count(pages, url, log->size);
+	}
 }
 
 static void process_log(struct log *log)
@@ -560,7 +559,6 @@ static void process_log(struct log *log)
 #endif
 }
 
-#ifdef TOP_TEN
 static void setup_sort(void)
 {
 	int i;
@@ -599,13 +597,12 @@ static void sort_pages(char *key, void *data, int len)
 		++n_top;
 	}
 }
-#endif
 
 int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "d:g:o:r:vI:V")) != EOF)
+	while ((i = getopt(argc, argv, "d:g:o:r:tvI:V")) != EOF)
 		switch (i) {
 		case 'd':
 			outdir = optarg;
@@ -623,6 +620,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'r':
 			init_range(strtol(optarg, NULL, 10));
+			break;
+		case 't':
+			enable_topten = 1;
 			break;
 		case 'v':
 			++verbose;
@@ -652,11 +652,11 @@ int main(int argc, char *argv[])
 	add_others("toronto-hs-216-138-233-67.s-ip.magma.ca");
 	add_others("m38a1.ca");
 
-#ifdef TOP_TEN
-	pages = db_open("pages");
-	if (!pages)
-		exit(1);
-#endif
+	if (enable_topten) {
+		pages = db_open("pages");
+		if (!pages)
+			exit(1);
+	}
 
 	if (enable_visits)
 		for (i = 0; i < n_sites; ++i) {
@@ -679,10 +679,10 @@ int main(int argc, char *argv[])
 
 	range_fixup();
 
-#ifdef TOP_TEN
-	setup_sort();
-	db_walk(pages, sort_pages);
-#endif
+	if (enable_topten) {
+		setup_sort();
+		db_walk(pages, sort_pages);
+	}
 
 	/* Calculate the totals */
 	for (i = 0; i < n_sites; ++i) {
