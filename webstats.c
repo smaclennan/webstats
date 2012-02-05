@@ -507,6 +507,10 @@ static void update_site(struct site *site, struct log *log, int whence)
 		/* Ignore rippers.ca */
 		if (strcmp(site->name, "rippers.ca") == 0)
 			return;
+
+		/* Ignore html */
+		if (ispage(log->url))
+			return;
 #endif
 
 		len = snprintf(url, sizeof(url), "%s%s", site->name, log->url);
@@ -682,6 +686,7 @@ int main(int argc, char *argv[])
 	if (enable_topten) {
 		setup_sort();
 		db_walk(pages, sort_pages);
+		db_close("pages", pages);
 	}
 
 	/* Calculate the totals */
