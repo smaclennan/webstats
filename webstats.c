@@ -17,8 +17,8 @@ static int offset = 35;
 static struct site {
 	char *name;
 	int color;
-	int hits;
-	int pages;
+	unsigned long hits;
+	unsigned long pages;
 	unsigned long size;
 	unsigned long arc;
 	DB *ipdb;
@@ -50,14 +50,14 @@ static char *outdir;
 static char *outfile = "stats.html";
 static char *outgraph = "pie.gif";
 
-DB *pages;
+static DB *pages;
 static int max_url;
 
 static struct {
 	char *name;
 	unsigned long size;
 } top[TOP_TEN];
-int n_top;
+static int n_top;
 
 #define m(n)   (((double)(n)) / 1024.0 / 1024.0)
 
@@ -180,6 +180,12 @@ static void add_include(char *fname, FILE *out)
 	fclose(in);
 }
 
+static inline void out_count(unsigned long count, unsigned long total, FILE *fp)
+{
+	fprintf(fp, "<td align=right>%lu<td align=right>%.1f%%",
+		count, (double)count * 100.0 / (double)total);
+}
+
 static void out_html(char *fname)
 {
 	int i;
@@ -210,20 +216,12 @@ static void out_html(char *fname)
 	for (i = 0; i < n_sites; ++i) {
 		if (sites[i].hits == 0)
 			continue;
-		fprintf(fp, "<tr><td>%s"
-			"<td align=right>%d<td align=right>%.1f%%",
-			sites[i].name,
-			sites[i].hits,
-			(double)sites[i].hits * 100.0 / (double)total_hits);
+		fprintf(fp, "<tr><td>%s", sites[i].name);
+		out_count(sites[i].hits, total_hits, fp);
 		if (enable_pages)
-			fprintf(fp, "<td align=right>%d<td align=right>%.1f%%",
-				sites[i].pages,
-				(double)sites[i].pages * 100.0 / (double)total_pages);
+			out_count(sites[i].pages, total_pages, fp);
 		if (enable_visits)
-			fprintf(fp, "<td align=right>%ld<td align=right>%.1f%%",
-				sites[i].visits,
-				(double)sites[i].visits * 100.0 /
-				(double)total_visits);
+			out_count(sites[i].visits, total_visits, fp);
 		fprintf(fp, "<td align=right>%.1f<td align=right>%.1f%%\n",
 			(double)sites[i].size / 1024.0,
 			(double)sites[i].size * 100.0 / (double)total_size);
@@ -251,7 +249,8 @@ static void out_html(char *fname)
 
 		for (i = 0; i < n_top; ++i) {
 			double size = m(top[i].size);
-			fprintf(fp, "<tr><td>%s<td align=right>%.1f\n", top[i].name, size);
+			fprintf(fp, "<tr><td>%s<td align=right>%.1f\n",
+				top[i].name, size);
 		}
 
 		fprintf(fp, "</table>\n");
@@ -290,7 +289,7 @@ static void out_txt(char *fname)
 	for (i = 0; i < n_sites; ++i) {
 		if (sites[i].hits == 0)
 			continue;
-		fprintf(fp, "%-20s%6d  %3.1f%%\t%6ld  %3.1f%%\n",
+		fprintf(fp, "%-20s%6ld  %3.1f%%\t%6ld  %3.1f%%\n",
 			sites[i].name, sites[i].hits,
 			(double)sites[i].hits * 100.0 / (double)total_hits,
 			sites[i].size / 1024,
@@ -489,15 +488,16 @@ static void update_site(struct site *site, struct log *log, int whence)
 	++site->hits;
 	site->size += log->size;
 
-	if (enable_pages || enable_visits)
-		if (log->status == 200 && ispage(log->url) && isbrowser(log->who)) {
-			++site->pages;
-			if (enable_visits && db_put(site->ipdb, log->ip) == 0) {
-				++site->visits;
-				if (verbose)
-					printf("%s: %s\n", site->name, log->ip);
-			}
+	if ((enable_pages || enable_visits) && log->status == 200 &&
+	    ispage(log->url) && isbrowser(log->who)) {
+		++site->pages;
+		if (enable_visits && db_put(site->ipdb, log->ip) == 0) {
+			++site->visits;
+			if (verbose)
+				printf("%s: %s\n",
+				       site->name, log->ip);
 		}
+	}
 
 	if (enable_topten) {
 		char url[256];
