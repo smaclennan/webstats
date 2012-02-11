@@ -199,4 +199,3 @@ time_t parse_date(struct tm *tm, char *month)
 	printf("BAD MONTH %s\n", month);
 	exit(1);
 }
-
