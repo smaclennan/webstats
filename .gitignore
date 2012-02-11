@@ -3,3 +3,8 @@ agent
 parse-logs
 webstats
 TAGS
+
+# Ignore webstats output files
+pie.gif
+stats.html
+stats.txt
