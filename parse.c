@@ -56,31 +56,36 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 		if (strncmp(line, "192.168.", 8) == 0)
 			continue;
 
+		/* This first chunk cannot fail */
 		memset(&tm, 0, sizeof(tm));
 		n = sscanf(line,
-			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
-			   "\"%s %s HTTP/1.%*d\" %d %s \"%n",
+			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] %n",
 			   ip, host,
 			   &tm.tm_mday, month, &tm.tm_year,
-			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
-			   method, url, &status, sstr, &where);
-
-		if (n == 10) {
-			/* sscanf \"%[^\"]\" cannot handle an empty string. */
-			*url = '\0';
-			if (sscanf(line,
-				   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] "
-				   "\"\" %d %s \"%n",
-				   ip, host,
-				   &tm.tm_mday, month, &tm.tm_year,
-				   &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
-				   &status, sstr, &where) != 10) {
-				printf("%d: Error [8] %s", log.lineno, line);
-				continue;
-			}
-		} else if (n != 12) {
-			printf("%d: Error [%d] %s", log.lineno, n, line);
+			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &where);
+		if (n != 8) {
+			printf("%d: Error Internal %s", log.lineno, line);
 			continue;
+		} else
+			s = line + where;
+
+		/* The URL line can be ugly - check normal case first */
+		n = sscanf(s, "\"%s %s HTTP/1.%*d\" %d %s \"%n",
+			   method, url, &status, sstr, &where);
+		if (n != 4) {
+			*url = '\0';
+			/* Check for empty URL */
+			n = sscanf(s, "\"%s HTTP/1.%*d\" %d %s \"%n",
+				   method, &status, sstr, &where);
+			if (n != 3) {
+				/* Check for empty string */
+				n = sscanf(s, "\"\" %d %s \"%n",
+					   &status, sstr, &where);
+				if (n != 2) {
+					printf("%d: Error %s", log.lineno, line);
+					continue;
+				}
+			}
 		}
 
 		/* This handles a '-' in the size field */
