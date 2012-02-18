@@ -503,16 +503,6 @@ static void update_site(struct site *site, struct log *log, int whence)
 		char url[256];
 		int len;
 
-#if 1
-		/* Ignore rippers.ca */
-		if (strcmp(site->name, "rippers.ca") == 0)
-			return;
-
-		/* Ignore html */
-		if (ispage(log->url))
-			return;
-#endif
-
 		len = snprintf(url, sizeof(url), "%s%s", site->name, log->url);
 		if (len > max_url)
 			max_url = len;
