@@ -39,7 +39,6 @@ struct list {
 static int verbose;
 
 static struct list *includes;
-static struct list *others;
 
 static unsigned long total_hits;
 static unsigned long total_pages;
@@ -434,11 +433,6 @@ static void add_list(char *name, struct list **head)
 	*head = l;
 }
 
-static void add_others(char *name)
-{
-	add_list(name, &others);
-}
-
 static int isbrowser(char *who)
 {
 #if 1
@@ -512,7 +506,6 @@ static void update_site(struct site *site, struct log *log, int whence)
 
 static void process_log(struct log *log)
 {
-	struct list *l;
 	int i;
 
 	if (!in_range(log))
@@ -538,19 +531,6 @@ static void process_log(struct log *log)
 
 	/* lighttpd defaults to seanm.ca for everything else */
 	update_site(&sites[0], log, 2);
-
-#if 1
-	if (strstr(log->host, "seanm.ca") == NULL) {
-		for (l = others; l; l = l->next)
-			if (strcmp(l->name, log->host) == 0)
-				break;
-
-		if (!l) {
-			add_others(log->host);
-			puts(log->host);
-		}
-	}
-#endif
 }
 
 static void setup_sort(void)
@@ -638,13 +618,6 @@ int main(int argc, char *argv[])
 		puts("I need a logfile to parse!");
 		exit(1);
 	}
-
-	/* preload some know others */
-	add_others("seanm.dyndns.org");
-	add_others("216.138.233.67");
-	add_others("216.138.233.67:80");
-	add_others("toronto-hs-216-138-233-67.s-ip.magma.ca");
-	add_others("m38a1.ca");
 
 	if (enable_topten) {
 		pages = db_open("pages");
