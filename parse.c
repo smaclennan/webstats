@@ -1,5 +1,9 @@
 #include "webstats.h"
 
+
+/* Most I have seen is 4282 */
+#define MAXLINE 4096
+
 time_t min_date = 0x7fffffff, max_date;
 
 
@@ -18,10 +22,22 @@ static inline FILE *my_fopen(char *logfile)
 
 static inline char *my_gets(char *line, int size, FILE *fp)
 {
+	char *s;
+
 	if (fp == stdin)
-		return fgets(line, size, fp);
+		s = fgets(line, size, fp);
 	else
-		return gzgets(fp, line, size);
+		s = gzgets(fp, line, size);
+
+	if (s) {
+		if (strchr(s, '\n') == NULL) {
+			puts("Line too long");
+			my_gets(line, size, fp);
+			return NULL;
+		}
+	}
+
+	return s;
 }
 
 static inline void my_fclose(FILE *fp)
@@ -33,7 +49,7 @@ static inline void my_fclose(FILE *fp)
 void parse_logfile(char *logfile, void (*func)(struct log *log))
 {
 	struct log log;
-	char line[4096], url[4096], refer[4096], who[4096];
+	char line[MAXLINE], url[MAXLINE], refer[MAXLINE], who[MAXLINE];
 	gzFile fp = my_fopen(logfile);
 	if (!fp) {
 		perror(logfile);
@@ -131,7 +147,7 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
  * virtual sites. */
 void parse_gopher_log(char *logfile, void (*func)(struct log *log))
 {
-	char line[4096], url[4096];
+	char line[MAXLINE], url[MAXLINE];
 	struct log log;
 	gzFile fp = gzopen(logfile, "rb");
 	if (!fp) {
