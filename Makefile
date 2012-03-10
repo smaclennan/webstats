@@ -1,4 +1,4 @@
-CFLAGS = -Wall -O3
+CFLAGS = -Wall -g # -O3
 
 all:	agent parse-logs webstats
 

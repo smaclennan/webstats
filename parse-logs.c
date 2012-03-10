@@ -99,13 +99,9 @@ static void process_log(struct log *log)
 #ifdef PAGES
 	if (log->status == 200) { /* only worry about real files */
 		char url[256], *host;
-		int len = strlen(log->url);
 		char *p = strstr(log->url, "index.htm");
 		if (p)
 			*p = '\0';
-
-		if (len > max_url)
-			max_url = len;
 
 #if 0
 		/* By directory */
@@ -125,7 +121,10 @@ static void process_log(struct log *log)
 		else if (strncmp(host, "www.", 4) == 0)
 			host += 4;
 
-		snprintf(url, sizeof(url), "%s%s", host, log->url);
+		int len = snprintf(url, sizeof(url), "%s%s", host, log->url);
+		if (len > max_url)
+			max_url = len;
+
 		db_update_count(pages, url, log->size);
 	}
 #endif
