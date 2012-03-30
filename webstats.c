@@ -488,8 +488,7 @@ static void update_site(struct site *site, struct log *log, int whence)
 		if (enable_visits && db_put(site->ipdb, log->ip) == 0) {
 			++site->visits;
 			if (verbose)
-				printf("%s: %s\n",
-				       site->name, log->ip);
+				printf("%s: %s\n", site->name, log->ip);
 		}
 	}
 
