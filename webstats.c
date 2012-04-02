@@ -27,7 +27,7 @@ static struct site {
 	{ "seanm.ca", 0xff0000 }, /* must be first! */
 	{ "rippers.ca", 0x0000ff },
 	{ "emacs", 0xffa500 },
-	{ "ftp.seanm.ca", 0x00ff00 },
+	/* { "ftp.seanm.ca", 0x00ff00 }, */
 };
 static int n_sites = sizeof(sites) / sizeof(struct site);
 
