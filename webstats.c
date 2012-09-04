@@ -282,22 +282,34 @@ static void out_txt(char *fname)
 	fprintf(fp, " to %s (%d days)\n", cur_date(max_date), days());
 	fprintf(fp, "Generated %s\n\n", cur_time(time(NULL)));
 
-	fputs("Site\t\t\t Hits\t\t     Size\n", fp);
+	fputs("Site\t\t\t Hits\t\t     Size", fp);
+	if (enable_visits)
+		fputs("\t     Visits", fp);
+	fputc('\n', fp);
+
 	out_hr(fp);
 
 	for (i = 0; i < n_sites; ++i) {
 		if (sites[i].hits == 0)
 			continue;
-		fprintf(fp, "%-20s%6ld  %3.1f%%\t%6ld  %3.1f%%\n",
+		fprintf(fp, "%-20s%6ld  %3.1f%%\t%6ld  %3.1f%%",
 			sites[i].name, sites[i].hits,
 			(double)sites[i].hits * 100.0 / (double)total_hits,
 			sites[i].size / 1024,
 			(double)sites[i].size * 100.0 / (double)total_size);
+		if (enable_visits)
+			fprintf(fp, "\t%6ld  %3.1f%%",
+				sites[i].visits,
+				(double)sites[i].visits * 100.0 / (double)total_visits);
+		fputc('\n', fp);
 	}
 
 	out_hr(fp);
-	fprintf(fp, "%-20s%6ld      \t%6ld\n",
+	fprintf(fp, "%-20s%6ld      \t%6ld",
 		"Totals", total_hits, total_size / 1024);
+	if (enable_visits)
+		fprintf(fp, "\t\t%6ld", total_visits);
+	fputc('\n', fp);
 
 	fclose(fp);
 }
