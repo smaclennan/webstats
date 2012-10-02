@@ -126,8 +126,11 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 
 		log.time = parse_date(&tm, month);
 
+		if (strncmp(host, "www.", 4) == 0)
+			log.host = host + 4;
+		else
+			log.host = host;
 		log.ip = ip;
-		log.host = host;
 		log.tm = &tm;
 		log.method = method;
 		log.url = url;
