@@ -7,25 +7,25 @@
 time_t min_date = 0x7fffffff, max_date;
 
 
-static inline FILE *my_fopen(char *logfile)
+static inline gzFile my_fopen(char *logfile)
 {
 	if (logfile) {
-		FILE *fp = gzopen(logfile, "rb");
+		gzFile fp = gzopen(logfile, "rb");
 		if (!fp) {
 			perror(logfile);
-			exit(1);
+			return NULL;
 		}
 		return fp;
 	} else
-		return stdin;
+		return (gzFile)stdin;
 }
 
-static inline char *my_gets(char *line, int size, FILE *fp)
+static inline char *my_gets(char *line, int size, gzFile fp)
 {
 	char *s;
 
-	if (fp == stdin)
-		s = fgets(line, size, fp);
+	if (fp == (gzFile)stdin)
+		s = fgets(line, size, stdin);
 	else
 		s = gzgets(fp, line, size);
 
@@ -40,20 +40,20 @@ static inline char *my_gets(char *line, int size, FILE *fp)
 	return s;
 }
 
-static inline void my_fclose(FILE *fp)
+static inline void my_fclose(gzFile fp)
 {
-	if (fp != stdin)
+	if (fp != (gzFile)stdin)
 		gzclose(fp);
 }
 
-void parse_logfile(char *logfile, void (*func)(struct log *log))
+int parse_logfile(char *logfile, void (*func)(struct log *log))
 {
 	struct log log;
 	char line[MAXLINE], url[MAXLINE], refer[MAXLINE], who[MAXLINE];
 	gzFile fp = my_fopen(logfile);
 	if (!fp) {
 		perror(logfile);
-		exit(1);
+		return 1;
 	}
 
 	memset(&log, 0, sizeof(log));
@@ -144,6 +144,8 @@ void parse_logfile(char *logfile, void (*func)(struct log *log))
 	}
 
 	my_fclose(fp);
+
+	return 0;
 }
 
 /* Gopher logfile is more limited. Plus, there is no concept of
