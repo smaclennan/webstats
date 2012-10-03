@@ -265,7 +265,6 @@ int main(int argc, char *argv[])
 	int arg, c, i;
 	char *basedir = BASEDIR;
 	char *botfile = "./botfile";
-	char *outfile;
 
 	compare_type = COMPARE_HITS;
 
@@ -285,9 +284,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'p':
 			compare_type = COMPARE_PAGES;
-			break;
-		case 'o':
-			outfile = optarg;
 			break;
 		default:
 			usage();
