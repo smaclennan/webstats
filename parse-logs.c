@@ -1,3 +1,4 @@
+#define _GNU_SOURCE /* for strcasestr */
 #include "webstats.h"
 
 
@@ -11,6 +12,7 @@ static char *outfile;
 #define DOMAINS
  */
 #define PAGES
+#define COUNTS
 #ifdef DOMAINS
 DB *domains;
 #endif
@@ -18,6 +20,10 @@ DB *domains;
 DB *pages;
 static int max_url;
 static double total = 0.0;
+#endif
+#ifdef COUNTS
+DB *counts;
+static int total_count;
 #endif
 
 #if 0
@@ -83,6 +89,7 @@ static int is_seanm_ca(char *host)
 }
 #endif
 
+#if 1
 static void process_log(struct log *log)
 {
 #if 0
@@ -118,8 +125,6 @@ static void process_log(struct log *log)
 		host = log->host;
 		if (is_seanm_ca(host))
 			host = "seanm.ca";
-		else if (strncmp(host, "www.", 4) == 0)
-			host += 4;
 
 		int len = snprintf(url, sizeof(url), "%s%s", host, log->url);
 		if (len > max_url)
@@ -129,6 +134,24 @@ static void process_log(struct log *log)
 	}
 #endif
 }
+#else
+static void process_log(struct log *log)
+{
+#if 0
+	if (strcmp(log->url, "/beer/") && strcmp(log->url, "/beer/index.html"))
+		return;
+
+	if (isabot(log->who))
+		return;
+#else
+	if (!strstr(log->url, "/beer/"))
+		return;
+#endif
+
+	db_update_count(counts, log->url, 1);
+	++total_count;
+}
+#endif
 
 #ifdef PAGES
 #define TEN 10
@@ -217,6 +240,11 @@ int main(int argc, char *argv[])
 	if (!pages)
 		exit(1);
 #endif
+#ifdef COUNTS
+	counts = db_open("counts");
+	if (!counts)
+		exit(1);
+#endif
 
 	if (optind == argc)
 		parse_logfile(NULL, process_log);
@@ -245,6 +273,12 @@ int main(int argc, char *argv[])
 	}
 
 	printf("Total %.1f\n", total);
+#endif
+#ifdef COUNTS
+	puts("Counts:");
+	db_walk(counts, print_count);
+	db_close("counts", counts);
+	printf("Total: %d\n", total_count);
 #endif
 
 	return 0;
