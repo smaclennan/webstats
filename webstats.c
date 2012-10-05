@@ -7,12 +7,11 @@
 
 #define TOP_TEN 10
 
-#define DAILY
-
 /* Visits takes no more time on YOW. */
 static int enable_visits;
 static int enable_pages;
 static int enable_topten;
+static int enable_daily;
 static int width = 422;
 static int offset = 35;
 
@@ -237,9 +236,8 @@ static void out_html(char *fname)
 
 	fprintf(fp, "</table>\n");
 
-#ifdef DAILY
-	fprintf(fp, "<p><img src=\"daily.gif\" alt=\"Daily Graph\">\n");
-#endif
+	if (enable_daily)
+		fprintf(fp, "<p><img src=\"daily.gif\" alt=\"Daily Graph\">\n");
 
 	while (includes) {
 		add_include(includes->name, fp);
@@ -435,7 +433,6 @@ static void out_graphs(void)
 	gdImageDestroy(im);
 }
 
-#ifdef DAILY
 #define ROUND 5000000
 #define D_X 50
 #define D_XDELTA 15
@@ -497,6 +494,9 @@ static void out_daily(void)
 	int color, width;
 	char maxstr[10];
 
+	if (!enable_daily)
+		return;
+
 	daily_im = gdImageCreate(D_WIDTH, D_HEIGHT);
 	color = gdImageColorAllocate(daily_im, 0xff, 0xff, 0xff); /* background */
 	gdImageColorTransparent(daily_im, color);
@@ -547,15 +547,8 @@ static void out_daily(void)
 	/* Destroy it */
 	gdImageDestroy(daily_im);
 
-#if 0
 	db_close(ddb, "daily.db");
-#else
-	// SAM DBG do not delete
-	db_close(ddb, NULL);
-#endif
 }
-
-#endif
 
 static void add_list(char *name, struct list **head)
 {
@@ -622,8 +615,7 @@ static void update_site(struct site *site, struct log *log, int whence)
 	++site->hits;
 	site->size += log->size;
 
-#ifdef DAILY
-	{
+	if (enable_daily) {
 		char timestr[16];
 
 		snprintf(timestr, sizeof(timestr), "%04d/%02d/%02d-%03d",
@@ -631,9 +623,7 @@ static void update_site(struct site *site, struct log *log, int whence)
 			 log->tm->tm_yday);
 
 		db_update_count(ddb, timestr, log->size);
-//		db_update_count(ddb, timestr, 1);
 	}
-#endif
 
 	if ((enable_pages || enable_visits) && log->status == 200 &&
 	    ispage(log->url) && isbrowser(log->who)) {
@@ -728,7 +718,7 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "d:g:o:r:tvI:V")) != EOF)
+	while ((i = getopt(argc, argv, "d:g:o:r:tvDI:V")) != EOF)
 		switch (i) {
 		case 'd':
 			outdir = optarg;
@@ -752,6 +742,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'v':
 			++verbose;
+			break;
+		case 'D':
+			enable_daily=1;
 			break;
 		case 'I':
 			add_list(optarg, &includes);
@@ -786,13 +779,13 @@ int main(int argc, char *argv[])
 			}
 		}
 
-#ifdef DAILY
-	ddb = db_open("daily.db");
-	if (!ddb) {
-		printf("Unable to open daily db\n");
-		exit(1);
+	if (enable_daily) {
+		ddb = db_open("daily.db");
+		if (!ddb) {
+			printf("Unable to open daily db\n");
+			exit(1);
+		}
 	}
-#endif
 
 	for (i = optind; i < argc; ++i) {
 		if (verbose)
@@ -829,9 +822,7 @@ int main(int argc, char *argv[])
 		total_size = 1;
 
 	out_graphs();
-#ifdef DAILY
 	out_daily();
-#endif
 	out_html(filename(outfile, NULL));
 	out_txt(filename(outfile, ".txt"));
 
