@@ -529,10 +529,8 @@ static void out_daily(void)
 	gdImageLine(daily_im, D_X, D_Y, width, D_Y, color); // x -axis
 	gdImageLine(daily_im, D_X, D_Y, D_X, D_Y - D_Y_HEIGHT, color); // x -axis
 
-	gdImageLine(daily_im, width, D_Y, width, D_Y - D_Y_HEIGHT, color); // SAM DBG
+	gdImageLine(daily_im, width, D_Y, width, D_Y - D_Y_HEIGHT, color);
 	gdImageLine(daily_im, D_X, D_Y - D_Y_HEIGHT, width, D_Y - D_Y_HEIGHT, color);
-
-
 
 	/* Save to file. */
 	char *fname = filename("daily.gif", NULL);
