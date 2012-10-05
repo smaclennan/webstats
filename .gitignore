@@ -6,5 +6,6 @@ TAGS
 
 # Ignore webstats output files
 pie.gif
+daily.gif
 stats.html
 stats.txt
