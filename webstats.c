@@ -7,6 +7,8 @@
 
 #define TOP_TEN 10
 
+#define DAILY
+
 /* Visits takes no more time on YOW. */
 static int enable_visits;
 static int enable_pages;
@@ -235,6 +237,10 @@ static void out_html(char *fname)
 
 	fprintf(fp, "</table>\n");
 
+#ifdef DAILY
+	fprintf(fp, "<p><img src=\"daily.gif\" alt=\"Daily Graph\">\n");
+#endif
+
 	while (includes) {
 		add_include(includes->name, fp);
 		includes = includes->next;
@@ -429,6 +435,128 @@ static void out_graphs(void)
 	gdImageDestroy(im);
 }
 
+#ifdef DAILY
+#define ROUND 5000000
+#define D_X 50
+#define D_XDELTA 15
+#define D_WIDTH (D_X + (32 - 1) * D_XDELTA + 20)
+
+#define D_Y_HEIGHT 200
+#define D_Y (D_Y_HEIGHT + 20)
+#define D_HEIGHT (D_Y + 20)
+#define D_Y_4 (D_Y_HEIGHT / 4)
+
+#define D_MAXSTR_X 20
+#define D_MAXSTR_Y (D_Y - D_Y_HEIGHT)
+
+static DB *ddb;
+static int max_daily, n_daily, dx, dy, dcolor;
+static gdImagePtr daily_im;
+
+static void find_max(char *key, void *data, int len)
+{
+	++n_daily;
+	if (*(unsigned long *)data > max_daily)
+		max_daily = *(unsigned long *)data;
+}
+
+static void one_daily(char *key, void *data, int len)
+{
+	char *p;
+	int yday;
+	static int last_x, last_y;
+	static int expected = -1;
+
+	p = strchr(key, '-');
+	if (!p) {
+		printf("Invalid timestr %s\n", key);
+		return;
+	}
+	yday = strtol(p + 1, NULL, 10);
+
+	if (expected != -1) {
+		dx += D_XDELTA;
+		while (expected < yday) {
+			++expected;
+			dx += D_XDELTA;
+		}
+	}
+
+	double factor = (double)(*(int *)data) / (double)max_daily * D_Y_HEIGHT;
+
+	if (expected != -1)
+		gdImageLine(daily_im, last_x, last_y, dx, dy - factor, dcolor);
+	last_x = dx;
+	last_y = dy - factor;
+
+	expected = yday + 1;
+}
+
+static void out_daily(void)
+{
+	int color, width;
+	char maxstr[10];
+
+	daily_im = gdImageCreate(D_WIDTH, D_HEIGHT);
+	color = gdImageColorAllocate(daily_im, 0xff, 0xff, 0xff); /* background */
+	gdImageColorTransparent(daily_im, color);
+
+	dcolor = gdImageColorAllocate(daily_im, 0xff, 0, 0);
+
+	max_daily = 0;
+	db_walk(ddb, find_max);
+	max_daily = ((max_daily + ROUND - 1) / ROUND) * ROUND;
+
+	width = n_daily * D_XDELTA + D_X - D_XDELTA;
+
+	color = gdImageColorAllocate(daily_im, 0xc0, 0xc0, 0xc0);
+
+	for (dy = D_Y_4 + 20; dy < D_Y_HEIGHT; dy += D_Y_4)
+		gdImageLine(daily_im, D_X, dy, width, dy, color);
+
+	dx = D_X;
+	dy = D_Y;
+
+	db_walk(ddb, one_daily);
+
+	color = gdImageColorAllocate(daily_im, 0, 0, 0);
+
+	snprintf(maxstr, sizeof(maxstr), "%dM", max_daily / 1000000);
+	gdImageString(daily_im, gdFontMediumBold,
+		      D_MAXSTR_X, D_MAXSTR_Y,
+		      (unsigned char *)maxstr, color);
+
+	gdImageLine(daily_im, D_X, D_Y, width, D_Y, color); // x -axis
+	gdImageLine(daily_im, D_X, D_Y, D_X, D_Y - D_Y_HEIGHT, color); // x -axis
+
+	gdImageLine(daily_im, width, D_Y, width, D_Y - D_Y_HEIGHT, color); // SAM DBG
+	gdImageLine(daily_im, D_X, D_Y - D_Y_HEIGHT, width, D_Y - D_Y_HEIGHT, color);
+
+
+
+	/* Save to file. */
+	char *fname = filename("daily.gif", NULL);
+	FILE *fp = fopen(fname, "wb");
+	if (!fp) {
+		perror(fname);
+		exit(1);
+	}
+	gdImageGif(daily_im, fp);
+	fclose(fp);
+
+	/* Destroy it */
+	gdImageDestroy(daily_im);
+
+#if 0
+	db_close(ddb, "daily.db");
+#else
+	// SAM DBG do not delete
+	db_close(ddb, NULL);
+#endif
+}
+
+#endif
+
 static void add_list(char *name, struct list **head)
 {
 	struct list *l = calloc(1, sizeof(struct list));
@@ -493,6 +621,19 @@ static void update_site(struct site *site, struct log *log, int whence)
 {
 	++site->hits;
 	site->size += log->size;
+
+#ifdef DAILY
+	{
+		char timestr[16];
+
+		snprintf(timestr, sizeof(timestr), "%04d/%02d/%02d-%03d",
+			 log->tm->tm_year + 1900, log->tm->tm_mon, log->tm->tm_mday,
+			 log->tm->tm_yday);
+
+		db_update_count(ddb, timestr, log->size);
+//		db_update_count(ddb, timestr, 1);
+	}
+#endif
 
 	if ((enable_pages || enable_visits) && log->status == 200 &&
 	    ispage(log->url) && isbrowser(log->who)) {
@@ -640,10 +781,18 @@ int main(int argc, char *argv[])
 		for (i = 0; i < n_sites; ++i) {
 			sites[i].ipdb = db_open(sites[i].name);
 			if (!sites[i].ipdb) {
-				printf("Unable to open db\n");
+				printf("Unable to open ip db\n");
 				exit(1);
 			}
 		}
+
+#ifdef DAILY
+	ddb = db_open("daily.db");
+	if (!ddb) {
+		printf("Unable to open daily db\n");
+		exit(1);
+	}
+#endif
 
 	for (i = optind; i < argc; ++i) {
 		if (verbose)
@@ -680,6 +829,9 @@ int main(int argc, char *argv[])
 		total_size = 1;
 
 	out_graphs();
+#ifdef DAILY
+	out_daily();
+#endif
 	out_html(filename(outfile, NULL));
 	out_txt(filename(outfile, ".txt"));
 
