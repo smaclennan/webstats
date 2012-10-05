@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
 #ifdef COUNTS
 	puts("Counts:");
 	db_walk(counts, print_count);
-	db_close("counts", counts);
+	db_close(counts, "counts");
 	printf("Total: %d\n", total_count);
 #endif
 

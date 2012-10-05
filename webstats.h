@@ -52,7 +52,7 @@ int db_get_data(DB *db, char *key, void *data, int len);
 int db_put_data(DB *db, char *key, void *data, int len, int flags);
 int db_update_count(DB *db, char *str, unsigned long i);
 int db_walk(DB *db, void (*func)(char *key, void *data, int len));
-void db_close(char *fname, DB *db);
+void db_close(DB *db, char *fname);
 
 static inline int db_put(DB *db, char *str)
 {

@@ -21,8 +21,8 @@ static struct site {
 	unsigned long pages;
 	unsigned long size;
 	unsigned long arc;
-	DB *ipdb;
 	unsigned long visits;
+	DB *ipdb;
 } sites[] = {
 	{ "seanm.ca", 0xff0000 }, /* must be first! */
 	{ "rippers.ca", 0x0000ff },
@@ -653,14 +653,14 @@ int main(int argc, char *argv[])
 
 	if (enable_visits)
 		for (i = 0; i < n_sites; ++i)
-			db_close(sites[i].name, sites[i].ipdb);
+			db_close(sites[i].ipdb, sites[i].name);
 
 	range_fixup();
 
 	if (enable_topten) {
 		setup_sort();
 		db_walk(pages, sort_pages);
-		db_close("pages", pages);
+		db_close(pages, "pages");
 	}
 
 	/* Calculate the totals */

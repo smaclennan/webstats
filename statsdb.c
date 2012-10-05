@@ -26,7 +26,7 @@ DB *db_open(char *fname)
 	}
 
 	if (db->open(db, NULL, dbname, NULL,
-		     DB_HASH, DB_CREATE | DB_TRUNCATE, 0664)) {
+		     DB_BTREE, DB_CREATE | DB_TRUNCATE, 0664)) {
 		printf("db_open failed\n");
 		return NULL;
 	}
@@ -126,13 +126,15 @@ int db_walk(DB *db, void (*func)(char *key, void *data, int len))
 	return rc;
 }
 
-void db_close(char *fname, DB *db)
+void db_close(DB *db, char *fname)
 {
-	char dbname[128];
-
 	db->close(db, 0);
 
-	snprintf(dbname, sizeof(dbname), "/dev/shm/%s", fname);
-	unlink(dbname);
+	if (fname) {
+		char dbname[128];
+
+		snprintf(dbname, sizeof(dbname), "/dev/shm/%s", fname);
+		unlink(dbname);
+	}
 }
 
