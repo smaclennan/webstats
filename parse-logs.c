@@ -10,20 +10,24 @@ static char *outfile;
 
 /*
 #define DOMAINS
- */
 #define PAGES
 #define COUNTS
+ */
+#define DAILY
 #ifdef DOMAINS
-DB *domains;
+static DB *domains;
 #endif
 #ifdef PAGES
-DB *pages;
+static DB *pages;
 static int max_url;
 static double total = 0.0;
 #endif
 #ifdef COUNTS
 DB *counts;
 static int total_count;
+#endif
+#ifdef DAILY
+static DB *ddb;
 #endif
 
 #if 0
@@ -74,7 +78,7 @@ static int is_page(char *url)
 }
 #endif
 
-#if 1
+#if 0
 /* Probably only of use to me ;) */
 static int is_seanm_ca(char *host)
 {
@@ -99,6 +103,16 @@ static void process_log(struct log *log)
 
 	if (!in_range(log))
 		return;
+
+#ifdef DAILY
+	char timestr[16];
+
+	snprintf(timestr, sizeof(timestr), "%04d/%02d/%02d-%03d",
+		 log->tm->tm_year + 1900, log->tm->tm_mon, log->tm->tm_mday,
+		 log->tm->tm_yday);
+
+	db_update_count(ddb, timestr, log->size);
+#endif
 
 #ifdef DOMAINS
 	db_update_count(domains, log->host, 1);
@@ -204,6 +218,14 @@ static void sort_pages(char *key, void *data, int len)
 
 #define m(n)   (((double)(n)) / 1024.0 / 1024.0)
 
+#ifdef DAILY
+void print_daily(char *key, void *data, int len)
+{
+	unsigned long size = *(unsigned long *)data;
+	printf("%s %6lu\n", key, (unsigned long)m(size));
+}
+#endif
+
 int main(int argc, char *argv[])
 {
 	int i;
@@ -229,6 +251,14 @@ int main(int argc, char *argv[])
 			puts("Sorry!");
 			exit(1);
 		}
+
+#ifdef DAILY
+	ddb = db_open("daily.db");
+	if (!ddb) {
+		printf("Unable to open daily db\n");
+		exit(1);
+	}
+#endif
 
 #ifdef DOMAINS
 	domains = db_open("domains");
@@ -257,6 +287,10 @@ int main(int argc, char *argv[])
 
 	range_fixup();
 
+#ifdef DAILY
+	db_walk(ddb, print_daily);
+	db_close(ddb, "daily.db");
+#endif
 #ifdef DOMAINS
 	puts("Domains:");
 	db_walk(domains, print);
