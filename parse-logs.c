@@ -3,7 +3,6 @@
 
 
 static int verbose;
-static int quiet;
 
 /* counts */
 static DB *counts;
@@ -196,12 +195,11 @@ static void usage(char *prog, int rc)
 	if (p)
 		prog = p + 1;
 
-	printf("usage: %s [-cdhpqvD] [-r range] [logfile ...]\nwhere:"
+	printf("usage: %s [-cdhpvD] [-r range] [logfile ...]\nwhere:"
 	       "\t-c enable counts\n"
 	       "\t-d enable domains\n"
 	       "\t-h help\n"
 	       "\t-p enable pages\n"
-	       "\t-q quiet\n"
 	       "\t-v verbose\n"
 	       "\t-D enable dailies\n",
 	       prog);
@@ -213,7 +211,7 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "cdhpqr:vD")) != EOF)
+	while ((i = getopt(argc, argv, "cdhpr:vD")) != EOF)
 		switch (i) {
 		case 'c':
 			counts = db_open("counts.db");
@@ -237,9 +235,6 @@ int main(int argc, char *argv[])
 				printf("Unable to open pages db\n");
 				exit(1);
 			}
-			break;
-		case 'q':
-			quiet = 1;
 			break;
 		case 'r':
 			init_range(strtol(optarg, NULL, 10));
