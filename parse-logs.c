@@ -71,11 +71,7 @@ static int is_page(char *url)
 /* Probably only of use to me ;) */
 static int is_seanm_ca(char *host)
 {
-	if (strstr(host, "rippers.ca") ||
-	    strstr(host, "m38a1.ca") ||
-	    strstr(host, "ftp.seanm.ca") ||
-	    strstr(host, "git.seanm.ca") ||
-	    strstr(host, "emacs.seanm.ca"))
+	if (strstr(host, "rippers.ca") || strstr(host, "m38a1.ca"))
 		return 0;
 
 	return 1;
