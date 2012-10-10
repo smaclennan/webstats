@@ -197,7 +197,8 @@ static void usage(char *prog, int rc)
 	       "\t-h help\n"
 	       "\t-p enable pages\n"
 	       "\t-v verbose\n"
-	       "\t-D enable dailies\n",
+	       "\t-D enable dailies\n"
+	       "Note: range is time in days\n",
 	       prog);
 
 	exit(rc);

@@ -712,11 +712,30 @@ static void sort_pages(char *key, void *data, int len)
 	}
 }
 
+static void usage(char *prog, int rc)
+{
+	char *p = strrchr(prog, '/');
+	if (p)
+		prog = p + 1;
+
+	printf("usage: %s [-htvDV] [-d outdir] [-g outgraph] [-o outfile] [-r range]\n"
+	       "\t\t[-I include] [logfile ...]\nwhere:"
+	       "\t-h help\n"
+	       "\t-t enable top ten\n"
+	       "\t-v verbose\n"
+	       "\t-D enable dailies\n"
+	       "\t-V enable visits\n"
+	       "Note: range is time in days\n",
+	       prog);
+
+	exit(rc);
+}
+
 int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "d:g:o:r:tvDI:V")) != EOF)
+	while ((i = getopt(argc, argv, "d:g:ho:r:tvDI:V")) != EOF)
 		switch (i) {
 		case 'd':
 			outdir = optarg;
@@ -724,6 +743,8 @@ int main(int argc, char *argv[])
 		case 'g':
 			outgraph = optarg;
 			break;
+		case 'h':
+			usage(argv[0], 0);
 		case 'o':
 			outfile = optarg;
 			break;
@@ -754,7 +775,7 @@ int main(int argc, char *argv[])
 			break;
 		default:
 			puts("Sorry!");
-			exit(1);
+			usage(argv[0], 1);
 		}
 
 	if (optind == argc) {
