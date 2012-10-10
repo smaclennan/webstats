@@ -197,9 +197,10 @@ static void out_html(char *fname)
 
 	out_header(fp, "Statistics for YOW");
 
-	fprintf(fp, "<p><img src=\"pie.gif\" width=%d height=235 "
-		"alt=\"Pie Charts\">\n\n",
-		width);
+	if (outgraph)
+		fprintf(fp, "<p><img src=\"%s\" width=%d height=235 "
+			"alt=\"Pie Charts\">\n\n",
+			outgraph, width);
 
 	fprintf(fp, "<p><table WIDTH=\"%d%%\" BORDER=1 "
 		"CELLSPACING=1 CELLPADDING=1",
@@ -348,6 +349,9 @@ static void out_graphs(void)
 	char *fname;
 	int i, tarc, color;
 	int x;
+
+	if (outgraph == NULL)
+		return;
 
 	gdImagePtr im = gdImageCreate(width, 235);
 	color = gdImageColorAllocate(im, 0xff, 0xff, 0xff); /* background */
@@ -725,8 +729,9 @@ static void usage(char *prog, int rc)
 	       "\t-v verbose\n"
 	       "\t-D enable dailies\n"
 	       "\t-V enable visits\n"
-	       "Note: range is time in days\n",
-	       prog);
+	       "Note: range is time in days\n"
+	       "      \"-g none\" disables the graphs\n"
+	       , prog);
 
 	exit(rc);
 }
@@ -741,7 +746,10 @@ int main(int argc, char *argv[])
 			outdir = optarg;
 			break;
 		case 'g':
-			outgraph = optarg;
+			if (strcmp(optarg, "none") == 0)
+				outgraph = NULL;
+			else
+				outgraph = optarg;
 			break;
 		case 'h':
 			usage(argv[0], 0);
