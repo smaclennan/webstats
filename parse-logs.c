@@ -5,30 +5,21 @@
 static int verbose;
 static int quiet;
 
-static char *outdir;
-static char *outfile;
-
-/*
-#define DOMAINS
-#define COUNTS
- */
-#ifdef DOMAINS
-static DB *domains;
-#endif
-#ifdef COUNTS
-DB *counts;
+/* counts */
+static DB *counts;
 static int total_count;
-#endif
+
+/* domains */
+static DB *domains;
 
 /* pages */
 static DB *pages;
 static int max_url;
 static double total = 0.0;
-static int enable_pages;
 
 /* daily */
 static DB *ddb;
-static int enable_daily;
+
 
 #if 0
 static int isabot(char *who)
@@ -91,18 +82,12 @@ static int is_seanm_ca(char *host)
 	return 1;
 }
 
-#if 1
 static void process_log(struct log *log)
 {
-#if 0
-	if (strcmp(log->host, "ftp.seanm.ca"))
-		return;
-#endif
-
 	if (!in_range(log))
 		return;
 
-	if (enable_daily) {
+	if (ddb) {
 		char timestr[16];
 
 		snprintf(timestr, sizeof(timestr), "%04d/%02d/%02d-%03d",
@@ -112,10 +97,15 @@ static void process_log(struct log *log)
 		db_update_count(ddb, timestr, log->size);
 	}
 
-#ifdef DOMAINS
-	db_update_count(domains, log->host, 1);
-#endif
-	if (enable_pages && log->status == 200) { /* only worry about real files */
+	if (counts) {
+		db_update_count(counts, log->url, 1);
+		++total_count;
+	}
+
+	if (domains)
+		db_update_count(domains, log->host, 1);
+
+	if (pages && log->status == 200) { /* only worry about real files */
 		char url[256], *host;
 		char *p = strstr(log->url, "index.htm");
 		if (p)
@@ -144,24 +134,6 @@ static void process_log(struct log *log)
 		db_update_count(pages, url, log->size);
 	}
 }
-#else
-static void process_log(struct log *log)
-{
-#if 0
-	if (strcmp(log->url, "/beer/") && strcmp(log->url, "/beer/index.html"))
-		return;
-
-	if (isabot(log->who))
-		return;
-#else
-	if (!strstr(log->url, "/beer/"))
-		return;
-#endif
-
-	db_update_count(counts, log->url, 1);
-	++total_count;
-}
-#endif
 
 #define TEN 10
 static struct list {
@@ -218,20 +190,48 @@ void print_daily(char *key, void *data, int len)
 	printf("%s %6lu\n", key, (unsigned long)m(size));
 }
 
+static void usage(char *prog, int rc)
+{
+	char *p = strrchr(prog, '/');
+	if (p)
+		prog = p + 1;
+
+	printf("usage: %s [-cdhpqvD] [-r range] [logfile ...]\nwhere:"
+	       "\t-c enable counts\n"
+	       "\t-d enable domains\n"
+	       "\t-h help\n"
+	       "\t-p enable pages\n"
+	       "\t-q quiet\n"
+	       "\t-v verbose\n"
+	       "\t-D enable dailies\n",
+	       prog);
+
+	exit(rc);
+}
+
 int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "d:o:pqr:vDV")) != EOF)
+	while ((i = getopt(argc, argv, "cdhpqr:vD")) != EOF)
 		switch (i) {
+		case 'c':
+			counts = db_open("counts.db");
+			if (!counts) {
+				printf("Unable to open counts db\n");
+				exit(1);
+			}
+			break;
 		case 'd':
-			outdir = optarg;
+			domains = db_open("domains.db");
+			if (!domains) {
+				printf("Unable to open pages db\n");
+				exit(1);
+			}
 			break;
-		case 'o':
-			outfile = optarg;
-			break;
+		case 'h':
+			usage(argv[0], 0);
 		case 'p':
-			enable_pages = 1;
 			pages = db_open("pages.db");
 			if (!pages) {
 				printf("Unable to open pages db\n");
@@ -248,7 +248,6 @@ int main(int argc, char *argv[])
 			++verbose;
 			break;
 		case 'D':
-			enable_daily = 1;
 			ddb = db_open("daily.db");
 			if (!ddb) {
 				printf("Unable to open daily db\n");
@@ -257,19 +256,8 @@ int main(int argc, char *argv[])
 			break;
 		default:
 			puts("Sorry!");
-			exit(1);
+			usage(argv[0], 1);
 		}
-
-#ifdef DOMAINS
-	domains = db_open("domains");
-	if (!domains)
-		exit(1);
-#endif
-#ifdef COUNTS
-	counts = db_open("counts");
-	if (!counts)
-		exit(1);
-#endif
 
 	if (optind == argc)
 		parse_logfile(NULL, process_log);
@@ -282,18 +270,18 @@ int main(int argc, char *argv[])
 
 	range_fixup();
 
-	if (enable_daily) {
+	if (ddb) {
 		db_walk(ddb, print_daily);
 		db_close(ddb, "daily.db");
 	}
 
-#ifdef DOMAINS
-	puts("Domains:");
-	db_walk(domains, print);
-	db_close("domains", domains);
-#endif
+	if (domains) {
+		puts("Domains:");
+		db_walk(domains, print);
+		db_close(domains, "domains.db");
+	}
 
-	if (enable_pages) {
+	if (pages) {
 		setup_sort();
 		db_walk(pages, sort_pages);
 
@@ -308,12 +296,12 @@ int main(int argc, char *argv[])
 		db_close(pages, "pages.db");
 	}
 
-#ifdef COUNTS
-	puts("Counts:");
-	db_walk(counts, print_count);
-	db_close(counts, "counts");
-	printf("Total: %d\n", total_count);
-#endif
+	if (counts) {
+		puts("Counts:");
+		db_walk(counts, print_count);
+		db_close(counts, "counts");
+		printf("Total: %d\n", total_count);
+	}
 
 	return 0;
 }
