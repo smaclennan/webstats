@@ -10,25 +10,25 @@ static char *outfile;
 
 /*
 #define DOMAINS
-#define PAGES
 #define COUNTS
  */
-#define DAILY
 #ifdef DOMAINS
 static DB *domains;
-#endif
-#ifdef PAGES
-static DB *pages;
-static int max_url;
-static double total = 0.0;
 #endif
 #ifdef COUNTS
 DB *counts;
 static int total_count;
 #endif
-#ifdef DAILY
+
+/* pages */
+static DB *pages;
+static int max_url;
+static double total = 0.0;
+static int enable_pages;
+
+/* daily */
 static DB *ddb;
-#endif
+static int enable_daily;
 
 #if 0
 static int isabot(char *who)
@@ -78,7 +78,6 @@ static int is_page(char *url)
 }
 #endif
 
-#if 0
 /* Probably only of use to me ;) */
 static int is_seanm_ca(char *host)
 {
@@ -91,7 +90,6 @@ static int is_seanm_ca(char *host)
 
 	return 1;
 }
-#endif
 
 #if 1
 static void process_log(struct log *log)
@@ -104,21 +102,20 @@ static void process_log(struct log *log)
 	if (!in_range(log))
 		return;
 
-#ifdef DAILY
-	char timestr[16];
+	if (enable_daily) {
+		char timestr[16];
 
-	snprintf(timestr, sizeof(timestr), "%04d/%02d/%02d-%03d",
-		 log->tm->tm_year + 1900, log->tm->tm_mon, log->tm->tm_mday,
-		 log->tm->tm_yday);
+		snprintf(timestr, sizeof(timestr), "%04d/%02d/%02d-%03d",
+			 log->tm->tm_year + 1900, log->tm->tm_mon, log->tm->tm_mday,
+			 log->tm->tm_yday);
 
-	db_update_count(ddb, timestr, log->size);
-#endif
+		db_update_count(ddb, timestr, log->size);
+	}
 
 #ifdef DOMAINS
 	db_update_count(domains, log->host, 1);
 #endif
-#ifdef PAGES
-	if (log->status == 200) { /* only worry about real files */
+	if (enable_pages && log->status == 200) { /* only worry about real files */
 		char url[256], *host;
 		char *p = strstr(log->url, "index.htm");
 		if (p)
@@ -146,7 +143,6 @@ static void process_log(struct log *log)
 
 		db_update_count(pages, url, log->size);
 	}
-#endif
 }
 #else
 static void process_log(struct log *log)
@@ -167,7 +163,6 @@ static void process_log(struct log *log)
 }
 #endif
 
-#ifdef PAGES
 #define TEN 10
 static struct list {
 	char *name;
@@ -214,29 +209,34 @@ static void sort_pages(char *key, void *data, int len)
 		++n_top;
 	}
 }
-#endif
 
 #define m(n)   (((double)(n)) / 1024.0 / 1024.0)
 
-#ifdef DAILY
 void print_daily(char *key, void *data, int len)
 {
 	unsigned long size = *(unsigned long *)data;
 	printf("%s %6lu\n", key, (unsigned long)m(size));
 }
-#endif
 
 int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "d:o:qr:v")) != EOF)
+	while ((i = getopt(argc, argv, "d:o:pqr:vDV")) != EOF)
 		switch (i) {
 		case 'd':
 			outdir = optarg;
 			break;
 		case 'o':
 			outfile = optarg;
+			break;
+		case 'p':
+			enable_pages = 1;
+			pages = db_open("pages.db");
+			if (!pages) {
+				printf("Unable to open pages db\n");
+				exit(1);
+			}
 			break;
 		case 'q':
 			quiet = 1;
@@ -247,27 +247,22 @@ int main(int argc, char *argv[])
 		case 'v':
 			++verbose;
 			break;
+		case 'D':
+			enable_daily = 1;
+			ddb = db_open("daily.db");
+			if (!ddb) {
+				printf("Unable to open daily db\n");
+				exit(1);
+			}
+			break;
 		default:
 			puts("Sorry!");
 			exit(1);
 		}
 
-#ifdef DAILY
-	ddb = db_open("daily.db");
-	if (!ddb) {
-		printf("Unable to open daily db\n");
-		exit(1);
-	}
-#endif
-
 #ifdef DOMAINS
 	domains = db_open("domains");
 	if (!domains)
-		exit(1);
-#endif
-#ifdef PAGES
-	pages = db_open("pages");
-	if (!pages)
 		exit(1);
 #endif
 #ifdef COUNTS
@@ -287,27 +282,32 @@ int main(int argc, char *argv[])
 
 	range_fixup();
 
-#ifdef DAILY
-	db_walk(ddb, print_daily);
-	db_close(ddb, "daily.db");
-#endif
+	if (enable_daily) {
+		db_walk(ddb, print_daily);
+		db_close(ddb, "daily.db");
+	}
+
 #ifdef DOMAINS
 	puts("Domains:");
 	db_walk(domains, print);
 	db_close("domains", domains);
 #endif
-#ifdef PAGES
-	setup_sort();
-	db_walk(pages, sort_pages);
 
-	for (i = 0; i < n_top; ++i) {
-		double size = m(top[i].size);
-		total += size;
-		printf("%-60s %.1f\n", top[i].name, size);
+	if (enable_pages) {
+		setup_sort();
+		db_walk(pages, sort_pages);
+
+		for (i = 0; i < n_top; ++i) {
+			double size = m(top[i].size);
+			total += size;
+			printf("%-60s %.1f\n", top[i].name, size);
+		}
+
+		printf("Total %.1f\n", total);
+
+		db_close(pages, "pages.db");
 	}
 
-	printf("Total %.1f\n", total);
-#endif
 #ifdef COUNTS
 	puts("Counts:");
 	db_walk(counts, print_count);
