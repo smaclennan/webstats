@@ -12,12 +12,14 @@ static int enable_visits;
 static int enable_pages;
 static int enable_topten;
 static int enable_daily;
+static int draw_3d;
 static int width = 422;
 static int offset = 35;
 
 static struct site {
 	char *name;
 	int color;
+	int dark;
 	unsigned long hits;
 	unsigned long pages;
 	unsigned long size;
@@ -25,8 +27,8 @@ static struct site {
 	unsigned long visits;
 	DB *ipdb;
 } sites[] = {
-	{ "seanm.ca", 0xff0000 }, /* must be first! */
-	{ "rippers.ca", 0x0000ff },
+	{ "seanm.ca", 0xff0000, 0x900000 }, /* must be first! */
+	{ "rippers.ca", 0x000080,  0x000050 },
 	/* { "emacs", 0xffa500 }, */
 	/* { "ftp.seanm.ca", 0x00ff00 }, */
 };
@@ -330,15 +332,41 @@ static int getcolor(gdImagePtr im, int color)
 static void draw_pie(gdImagePtr im, int cx, int cy, int size)
 {
 	int color;
-	int i, s = 0, e;
+	int i, s, e;
 
-	for (i = 0; i < n_sites; ++i) {
-		color = getcolor(im, sites[i].color);
-		/* convert percent to arc */
+	if (draw_3d) {
+		int j;
+
+		s = 0;
+		for (i = n_sites - 1; i >= 0; --i) {
+			if (sites[i].arc == 0)
+				continue;
+
+			color = getcolor(im, sites[i].dark);
+
+			e = s + sites[i].arc;
+
+			for (j = 10; j > 0; j--)
+				gdImageFilledArc(im, cx, cy + j, size, size / 2, s, e, color, gdArc);
+
+			s = e;
+		}
+	}
+
+	s = 0;
+	for (i = n_sites - 1; i >= 0; --i) {
 		if (sites[i].arc == 0)
 			continue;
+
+		color = getcolor(im, sites[i].color);
+
 		e = s + sites[i].arc;
-		gdImageFilledArc(im, cx, cy, size, size, s, e, color, gdArc);
+
+		if (draw_3d)
+			gdImageFilledArc(im, cx, cy, size, size / 2, s, e, color, gdArc);
+		else
+			gdImageFilledArc(im, cx, cy, size, size, s, e, color, gdArc);
+
 		s = e;
 	}
 }
@@ -378,13 +406,13 @@ static void out_graphs(void)
 		x += 100;
 	}
 
-	for (tarc = i = 0; i < n_sites; ++i) {
+	for (tarc = 0, i = n_sites - 1; i > 0; --i) {
 		sites[i].arc = sites[i].hits * 360 / total_hits;
 		tarc += sites[i].arc;
 	}
 
 	/* Compensate the first arc */
-	sites[0].arc += 360 - tarc;
+	sites[0].arc = 360 - tarc;
 
 	draw_pie(im, 100, 100, 198);
 
@@ -740,8 +768,11 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "d:g:ho:r:tvDI:V")) != EOF)
+	while ((i = getopt(argc, argv, "3d:g:ho:r:tvDI:V")) != EOF)
 		switch (i) {
+		case '3':
+			draw_3d = 1;
+			break;
 		case 'd':
 			outdir = optarg;
 			break;
