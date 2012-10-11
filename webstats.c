@@ -16,6 +16,10 @@ static int draw_3d;
 static int width = 422;
 static int offset = 35;
 
+static struct tm *yesterday;
+static unsigned long y_hits;
+static unsigned long y_size;
+
 static struct site {
 	char *name;
 	int color;
@@ -115,6 +119,8 @@ static void out_header(FILE *fp, char *title)
 	fprintf(fp, "Summary Period: %s", cur_date(min_date));
 	fprintf(fp, " to %s (%d days)<br>\n", cur_date(max_date), days());
 	fprintf(fp, "Generated %s<br>\n", cur_time(time(NULL)));
+	if (yesterday)
+		fprintf(fp, "Yesterday had %lu hits for %.1fM\n", y_hits, m(y_size));
 	fprintf(fp, "</strong></small>\n<hr>\n");
 	fprintf(fp, "<center>\n\n");
 }
@@ -683,6 +689,13 @@ static void process_log(struct log *log)
 	if (!in_range(log))
 		return;
 
+	if (yesterday &&
+	    yesterday->tm_mon == log->tm->tm_mon &&
+	    yesterday->tm_mday == log->tm->tm_mday) {
+		++y_hits;
+		y_size += log->size;
+	}
+
 	/* Unqualified lines */
 	if (*log->host == '-') {
 		update_site(&sites[0], log, 0);
@@ -768,7 +781,7 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "3d:g:ho:r:tvDI:V")) != EOF)
+	while ((i = getopt(argc, argv, "3d:g:ho:r:tvyDI:V")) != EOF)
 		switch (i) {
 		case '3':
 			draw_3d = 1;
@@ -800,6 +813,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'v':
 			++verbose;
+			break;
+		case 'y':
+			yesterday = calc_yesterday();
 			break;
 		case 'D':
 			enable_daily=1;

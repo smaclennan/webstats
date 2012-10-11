@@ -38,6 +38,7 @@ time_t parse_date(struct tm *tm, char *month);
 char *cur_time(time_t now);
 char *cur_date(time_t now);
 int days(void);
+struct tm *calc_yesterday(void);
 
 void init_range(int days);
 int in_range(struct log *log);

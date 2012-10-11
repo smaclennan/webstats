@@ -3,7 +3,6 @@
 static time_t start, end;
 static time_t real_min = 0x7fffffff, real_max;
 
-
 char *cur_time(time_t now)
 {
 	static char timestamp[32];
@@ -69,4 +68,18 @@ void range_fixup(void)
 		min_date = real_min;
 		max_date = real_max;
 	}
+}
+
+struct tm *calc_yesterday(void)
+{
+	static struct tm ytm;
+	time_t yesterday, now = time(NULL);
+	struct tm *tm = localtime(&now);
+
+	tm->tm_mday--;
+	yesterday = mktime(tm);
+	tm = localtime(&yesterday);
+
+	memcpy(&ytm, tm, sizeof(ytm));
+	return &ytm;
 }
