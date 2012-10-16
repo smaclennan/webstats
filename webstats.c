@@ -33,6 +33,7 @@ static struct site {
 } sites[] = {
 	{ "seanm.ca", 0xff0000, 0x900000 }, /* must be first! */
 	{ "rippers.ca", 0x000080,  0x000050 },
+	{ "m38a1.ca", 0xffa500, 0xcf7500 },
 	/* { "emacs", 0xffa500 }, */
 	/* { "ftp.seanm.ca", 0x00ff00 }, */
 };
@@ -707,12 +708,6 @@ static void process_log(struct log *log)
 			update_site(&sites[i], log, 1);
 			return;
 		}
-
-	if (strcmp(log->host, "yow") == 0 ||
-	    strcmp(log->host, "localhost") == 0 ||
-	    strncmp(log->host, "192.168.", 8) == 0 ||
-	    strcmp(log->host, "127.0.0.1") == 0)
-		return; /* don't count locals */
 
 	/* lighttpd defaults to seanm.ca for everything else */
 	update_site(&sites[0], log, 2);
