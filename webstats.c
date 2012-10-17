@@ -647,7 +647,7 @@ static int ispage(char *url)
 	return 0;
 }
 
-static void update_site(struct site *site, struct log *log, int whence)
+static void update_site(struct site *site, struct log *log)
 {
 	++site->hits;
 	site->size += log->size;
@@ -697,20 +697,14 @@ static void process_log(struct log *log)
 		y_size += log->size;
 	}
 
-	/* Unqualified lines */
-	if (*log->host == '-') {
-		update_site(&sites[0], log, 0);
-		return;
-	}
-
 	for (i = 1; i < n_sites; ++i)
 		if (strstr(log->host, sites[i].name)) {
-			update_site(&sites[i], log, 1);
+			update_site(&sites[i], log);
 			return;
 		}
 
 	/* lighttpd defaults to seanm.ca for everything else */
-	update_site(&sites[0], log, 2);
+	update_site(&sites[0], log);
 }
 
 static void setup_sort(void)
