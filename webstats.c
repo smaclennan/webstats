@@ -20,6 +20,8 @@ static struct tm *yesterday;
 static unsigned long y_hits;
 static unsigned long y_size;
 
+static int today; /* today as a yday */
+
 static struct site {
 	char *name;
 	int color;
@@ -510,6 +512,9 @@ static void one_daily(char *key, void *data, int len)
 	}
 	yday = strtol(p + 1, NULL, 10);
 
+	if (yday == today)
+		return;
+
 	if (expected != -1) {
 		dx += D_XDELTA;
 		while (expected < yday) {
@@ -545,6 +550,8 @@ static void out_daily(void)
 	max_daily = 0;
 	db_walk(ddb, find_max);
 	max_daily = ((max_daily + ROUND - 1) / ROUND) * ROUND;
+
+	--n_daily; /* we skip today */
 
 	width = n_daily * D_XDELTA + D_X - D_XDELTA;
 
@@ -752,6 +759,13 @@ static void sort_pages(char *key, void *data, int len)
 	}
 }
 
+static void set_today(void)
+{
+	time_t now = time(NULL);
+	struct tm *tm = localtime(&now);
+	today = tm->tm_yday;
+}
+
 static void usage(char *prog, int rc)
 {
 	char *p = strrchr(prog, '/');
@@ -854,6 +868,7 @@ int main(int argc, char *argv[])
 			printf("Unable to open daily db\n");
 			exit(1);
 		}
+		set_today();
 	}
 
 	for (i = optind; i < argc; ++i) {
