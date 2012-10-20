@@ -1,6 +1,8 @@
 #define _GNU_SOURCE /* for strcasestr */
 #include "webstats.h"
 
+#include <sys/utsname.h>
+
 #include <gd.h>
 #include <gdfontmb.h>
 #include <gdfonts.h>
@@ -19,6 +21,8 @@ static int offset = 35;
 static struct tm *yesterday;
 static unsigned long y_hits;
 static unsigned long y_size;
+
+static char host[32];
 
 static int today; /* today as a yday */
 
@@ -102,21 +106,21 @@ static char *filename(char *fname, char *ext)
 	return out;
 }
 
-static void out_header(FILE *fp, char *title)
+static void out_header(FILE *fp)
 {
 	/* Header proper */
 	fprintf(fp,
 		"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n"
 		"<html lang=\"en\">\n"
 		"<head>\n"
-		"  <title>%s</title>\n"
+		"  <title>Statistics for %s</title>\n"
 		"  <meta http-equiv=\"Content-type\" content=\"text/html;charset=utf-8\">\n"
 		"  <style type=\"text/css\"> <!-- body { margin: 0 10%%; } --> </style>\n"
-		"</head>\n", title);
+		"</head>\n", host);
 
 	/* Body */
 	fprintf(fp, "<body BGCOLOR=\"#E8E8E8\">\n");
-	fprintf(fp, "<h2>%s</h2>\n", title);
+	fprintf(fp, "<h2>Statistics for %s</h2>\n", host);
 	fprintf(fp, "<small><strong>\n");
 	/* Warning: cur_time/date has a local static for buffer */
 	fprintf(fp, "Summary Period: %s", cur_date(min_date));
@@ -206,7 +210,7 @@ static void out_html(char *fname)
 		return;
 	}
 
-	out_header(fp, "Statistics for YOW");
+	out_header(fp);
 
 	if (outgraph)
 		fprintf(fp, "<p><img src=\"%s\" width=%d height=235 "
@@ -293,7 +297,7 @@ static void out_txt(char *fname)
 		return;
 	}
 
-	fprintf(fp, "Statistics for YOW\n");
+	fprintf(fp, "Statistics for %s\n", host);
 	fprintf(fp, "Summary Period: %s", cur_date(min_date));
 	fprintf(fp, " to %s (%d days)\n", cur_date(max_date), days());
 	fprintf(fp, "Generated %s\n\n", cur_time(time(NULL)));
@@ -816,6 +820,16 @@ static void set_today(void)
 	today = tm->tm_yday;
 }
 
+static void get_hostname(void)
+{
+	struct utsname uts;
+
+	if (uname(&uts) == 0)
+		snprintf(host, sizeof(host), uts.nodename);
+	else
+		strcpy(host, "yow");
+}
+
 static void usage(char *prog, int rc)
 {
 	char *p = strrchr(prog, '/');
@@ -896,6 +910,8 @@ int main(int argc, char *argv[])
 		puts("I need a logfile to parse!");
 		exit(1);
 	}
+
+	get_hostname();
 
 	if (enable_topten) {
 		pages = db_open("pages");
