@@ -490,6 +490,7 @@ static void out_graphs(void)
 static DB *ddb;
 static int max_daily, n_daily, dx, dy, dcolor;
 static gdImagePtr daily_im;
+static unsigned long daily_total, daily_n;
 
 static void find_max(char *key, void *data, int len)
 {
@@ -518,6 +519,7 @@ static void one_daily(char *key, void *data, int len)
 	if (expected != -1) {
 		dx += D_XDELTA;
 		while (expected < yday) {
+			++daily_n;
 			++expected;
 			dx += D_XDELTA;
 		}
@@ -529,6 +531,40 @@ static void one_daily(char *key, void *data, int len)
 		gdImageLine(daily_im, last_x, last_y, dx, dy - factor, dcolor);
 	last_x = dx;
 	last_y = dy - factor;
+
+	expected = yday + 1;
+
+	daily_total += *(unsigned *)data;
+	++daily_n;
+}
+
+static void two_daily(char *key, void *data, int len)
+{
+	char *p;
+	int yday;
+	static int expected = -1;
+
+	p = strchr(key, '-');
+	if (!p) {
+		printf("Invalid timestr %s\n", key);
+		return;
+	}
+	yday = strtol(p + 1, NULL, 10);
+
+	if (yday == today)
+		return;
+
+	if (expected != -1) {
+		dx += D_XDELTA;
+		while (expected < yday) {
+			++expected;
+			dx += D_XDELTA;
+		}
+	}
+
+	double factor = (double)(*(int *)data) / (double)max_daily * D_Y_HEIGHT;
+
+	gdImageFilledArc(daily_im, dx, dy - factor, 5, 5, 0, 360, dcolor, gdArc);
 
 	expected = yday + 1;
 }
@@ -562,8 +598,22 @@ static void out_daily(void)
 
 	dx = D_X;
 	dy = D_Y;
-
 	db_walk(ddb, one_daily);
+	dx = D_X;
+	dy = D_Y;
+	db_walk(ddb, two_daily);
+
+	/* Draw average */
+	color = gdImageColorAllocate(daily_im, 0, 0, 0xff);
+	double avg = (double)daily_total / (double)daily_n;
+	double factor = avg / (double)max_daily * D_Y_HEIGHT;
+	gdImageLine(daily_im, D_X, D_Y - factor, width, D_Y - factor, color);
+	gdImageLine(daily_im, D_X, D_Y - factor - 1, width, D_Y - factor - 1, color);
+
+	snprintf(maxstr, sizeof(maxstr), "%dM", (unsigned)avg / 1000000);
+	gdImageString(daily_im, gdFontMediumBold,
+		      D_MAXSTR_X, D_Y - factor - 7,
+		      (unsigned char *)maxstr, color);
 
 	color = gdImageColorAllocate(daily_im, 0, 0, 0);
 
