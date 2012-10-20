@@ -874,7 +874,7 @@ static void usage(char *prog, int rc)
 
 int main(int argc, char *argv[])
 {
-	int i;
+	int i, had_hits;
 
 	while ((i = getopt(argc, argv, "3d:g:ho:r:tvyDI:V")) != EOF)
 		switch (i) {
@@ -995,7 +995,12 @@ int main(int argc, char *argv[])
 	if (total_size == 0)
 		total_size = 1;
 
-	out_graphs();
+	for (had_hits = i = 0; i < n_sites; ++i)
+		if (sites[i].hits)
+			++had_hits;
+
+	if (had_hits > 1) /* graph of 100% for one site is boring */
+		out_graphs();
 	out_daily();
 	out_html(filename(outfile, NULL));
 	out_txt(filename(outfile, ".txt"));
