@@ -23,6 +23,7 @@ static unsigned long y_hits;
 static unsigned long y_size;
 
 static char host[32];
+static int default_host;
 
 static int today; /* today as a yday */
 
@@ -412,12 +413,13 @@ static void out_graphs(void)
 			      (unsigned char *)"Pages", color);
 
 	x = offset;
-	for (i = 0; i < n_sites; ++i) {
-		color = getcolor(im, sites[i].color);
-		gdImageString(im, gdFontSmall, x, 220,
-			      (unsigned char *)sites[i].name, color);
-		x += 100;
-	}
+	for (i = 0; i < n_sites; ++i)
+		if (sites[i].hits) {
+			color = getcolor(im, sites[i].color);
+			gdImageString(im, gdFontSmall, x, 220,
+				      (unsigned char *)sites[i].name, color);
+			x += 100;
+		}
 
 	for (tarc = 0, i = n_sites - 1; i > 0; --i) {
 		sites[i].arc = sites[i].hits * 360 / total_hits;
@@ -770,8 +772,8 @@ static void process_log(struct log *log)
 			return;
 		}
 
-	/* lighttpd defaults to seanm.ca for everything else */
-	update_site(&sites[0], log);
+	/* lighttpd defaults to `default_host' for everything else */
+	update_site(&sites[default_host], log);
 }
 
 static void setup_sort(void)
@@ -828,6 +830,26 @@ static void get_hostname(void)
 		snprintf(host, sizeof(host), uts.nodename);
 	else
 		strcpy(host, "yow");
+}
+
+static void get_default_host(void)
+{	/* lighttpd specific */
+	char line[128], def[128];
+	FILE *fp = fopen("/etc/lighttpd/lighttpd.conf", "r");
+	if (!fp)
+		return;
+
+	while (fgets(line, sizeof(line), fp))
+		if (sscanf(line,
+			   "simple-vhost.default-host  = \"%[^\"]", def) == 1) {
+			int i;
+			for (i = 0; i < n_sites; ++i)
+				if (strcmp(sites[i].name, def) == 0)
+					default_host = i;
+			break;
+		}
+
+	fclose(fp);
 }
 
 static void usage(char *prog, int rc)
@@ -912,6 +934,8 @@ int main(int argc, char *argv[])
 	}
 
 	get_hostname();
+
+	get_default_host();
 
 	if (enable_topten) {
 		pages = db_open("pages");
