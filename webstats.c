@@ -596,12 +596,10 @@ static void out_daily(void)
 	for (dy = D_Y_4 + 20; dy < D_Y_HEIGHT; dy += D_Y_4)
 		gdImageLine(daily_im, D_X, dy, width, dy, color);
 
+	/* Draw lines */
 	dx = D_X;
 	dy = D_Y;
 	db_walk(ddb, one_daily);
-	dx = D_X;
-	dy = D_Y;
-	db_walk(ddb, two_daily);
 
 	/* Draw average */
 	color = gdImageColorAllocate(daily_im, 0, 0, 0xff);
@@ -615,6 +613,7 @@ static void out_daily(void)
 		      D_MAXSTR_X, D_Y - factor - 7,
 		      (unsigned char *)maxstr, color);
 
+	/* Draw box */
 	color = gdImageColorAllocate(daily_im, 0, 0, 0);
 
 	snprintf(maxstr, sizeof(maxstr), "%dM", max_daily / 1000000);
@@ -627,6 +626,13 @@ static void out_daily(void)
 
 	gdImageLine(daily_im, width, D_Y, width, D_Y - D_Y_HEIGHT, color);
 	gdImageLine(daily_im, D_X, D_Y - D_Y_HEIGHT, width, D_Y - D_Y_HEIGHT, color);
+
+
+	/* Draw dots last */
+	dx = D_X;
+	dy = D_Y;
+	db_walk(ddb, two_daily);
+
 
 	/* Save to file. */
 	char *fname = filename("daily.gif", NULL);
