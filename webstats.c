@@ -844,12 +844,22 @@ static void get_default_host(void)
 			   "simple-vhost.default-host  = \"%[^\"]", def) == 1) {
 			int i;
 			for (i = 0; i < n_sites; ++i)
-				if (strcmp(sites[i].name, def) == 0)
+				if (strcmp(sites[i].name, def) == 0) {
 					default_host = i;
+				}
 			break;
 		}
 
 	fclose(fp);
+
+
+	/* default host gets red */
+	if (default_host != 0) {
+		sites[0].color = sites[default_host].color;
+		sites[0].dark = sites[default_host].dark;
+		sites[default_host].color = 0xff0000;
+		sites[default_host].dark = 0x900000;
+	}
 }
 
 static void usage(char *prog, int rc)
