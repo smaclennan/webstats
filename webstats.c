@@ -496,11 +496,33 @@ static void out_graphs(void)
 static DB *ddb;
 static int max_daily, n_daily, dx, dy, dcolor;
 static gdImagePtr daily_im;
-static unsigned long daily_total, daily_n;
+static unsigned long daily_total;
 
 static void find_max(char *key, void *data, int len)
 {
+	char *p;
+	int yday;
+	static int expected = -1;
+
+	p = strchr(key, '-');
+	if (!p) {
+		printf("Invalid timestr %s\n", key);
+		return;
+	}
+	yday = strtol(p + 1, NULL, 10);
+
+	if (yday >= today)
+		return;
+
+	if (expected != -1)
+		while (expected < yday) {
+			++n_daily;
+			++expected;
+		}
+
+	expected = yday + 1;
 	++n_daily;
+
 	if (*(unsigned long *)data > max_daily)
 		max_daily = *(unsigned long *)data;
 }
@@ -519,13 +541,12 @@ static void one_daily(char *key, void *data, int len)
 	}
 	yday = strtol(p + 1, NULL, 10);
 
-	if (yday == today)
+	if (yday >= today)
 		return;
 
 	if (expected != -1) {
 		dx += D_XDELTA;
 		while (expected < yday) {
-			++daily_n;
 			++expected;
 			dx += D_XDELTA;
 		}
@@ -541,7 +562,6 @@ static void one_daily(char *key, void *data, int len)
 	expected = yday + 1;
 
 	daily_total += *(unsigned *)data;
-	++daily_n;
 }
 
 static void two_daily(char *key, void *data, int len)
@@ -557,7 +577,7 @@ static void two_daily(char *key, void *data, int len)
 	}
 	yday = strtol(p + 1, NULL, 10);
 
-	if (yday == today)
+	if (yday >= today)
 		return;
 
 	if (expected != -1) {
@@ -593,8 +613,6 @@ static void out_daily(void)
 	db_walk(ddb, find_max);
 	max_daily = ((max_daily + ROUND - 1) / ROUND) * ROUND;
 
-	--n_daily; /* we skip today */
-
 	width = n_daily * D_XDELTA + D_X - D_XDELTA;
 
 	color = gdImageColorAllocate(daily_im, 0xc0, 0xc0, 0xc0);
@@ -609,7 +627,7 @@ static void out_daily(void)
 
 	/* Draw average */
 	color = gdImageColorAllocate(daily_im, 0, 0, 0xff);
-	double avg = (double)daily_total / (double)daily_n;
+	double avg = (double)daily_total / (double)n_daily;
 	double factor = avg / (double)max_daily * D_Y_HEIGHT;
 	gdImageLine(daily_im, D_X, D_Y - factor, width, D_Y - factor, color);
 	gdImageLine(daily_im, D_X, D_Y - factor - 1, width, D_Y - factor - 1, color);
