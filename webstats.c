@@ -51,6 +51,11 @@ struct list {
 	struct list *next;
 };
 
+static struct point {
+	int x, y;
+	struct point *prev, *next;
+} *points;
+
 static int verbose;
 
 static struct list *includes;
@@ -527,11 +532,30 @@ static void find_max(char *key, void *data, int len)
 		max_daily = *(unsigned long *)data;
 }
 
+static void add_point(int x, int y)
+{
+	static struct point *tail;
+	struct point *new = calloc(1, sizeof(struct point));
+	if (!new) {
+		puts("Out of memory!\n");
+		exit(1);
+	}
+
+	new->x = x;
+	new->y = y;
+
+	if (points) {
+		new->prev = tail;
+		tail->next = new;
+		tail = new;
+	} else
+		points = tail = new;
+}
+
 static void one_daily(char *key, void *data, int len)
 {
 	char *p;
 	int yday;
-	static int last_x, last_y;
 	static int expected = -1;
 
 	p = strchr(key, '-');
@@ -554,49 +578,16 @@ static void one_daily(char *key, void *data, int len)
 
 	double factor = (double)(*(int *)data) / (double)max_daily * D_Y_HEIGHT;
 
-	if (expected != -1)
-		gdImageLine(daily_im, last_x, last_y, dx, dy - factor, dcolor);
-	last_x = dx;
-	last_y = dy - factor;
+	add_point(dx, dy - factor);
 
 	expected = yday + 1;
 
 	daily_total += *(unsigned *)data;
 }
 
-static void two_daily(char *key, void *data, int len)
-{
-	char *p;
-	int yday;
-	static int expected = -1;
-
-	p = strchr(key, '-');
-	if (!p) {
-		printf("Invalid timestr %s\n", key);
-		return;
-	}
-	yday = strtol(p + 1, NULL, 10);
-
-	if (yday >= today)
-		return;
-
-	if (expected != -1) {
-		dx += D_XDELTA;
-		while (expected < yday) {
-			++expected;
-			dx += D_XDELTA;
-		}
-	}
-
-	double factor = (double)(*(int *)data) / (double)max_daily * D_Y_HEIGHT;
-
-	gdImageFilledArc(daily_im, dx, dy - factor, 5, 5, 0, 360, dcolor, gdArc);
-
-	expected = yday + 1;
-}
-
 static void out_daily(void)
 {
+	struct point *point;
 	int color, width;
 	char maxstr[10];
 
@@ -620,10 +611,21 @@ static void out_daily(void)
 	for (dy = D_Y_4 + 20; dy < D_Y_HEIGHT; dy += D_Y_4)
 		gdImageLine(daily_im, D_X, dy, width, dy, color);
 
-	/* Draw lines */
 	dx = D_X;
 	dy = D_Y;
 	db_walk(ddb, one_daily);
+
+	if (!points) {
+		puts("NO POINTS!");
+		return;
+	}
+
+	/* Draw lines */
+	for (point = points->next; point; point = point->next)
+		gdImageLine(daily_im,
+			    point->prev->x, point->prev->y,
+			    point->x, point->y,
+			    dcolor);
 
 	/* Draw average */
 	color = gdImageColorAllocate(daily_im, 0, 0, 0xff);
@@ -653,10 +655,8 @@ static void out_daily(void)
 
 
 	/* Draw dots last */
-	dx = D_X;
-	dy = D_Y;
-	db_walk(ddb, two_daily);
-
+	for (point = points; point; point = point->next)
+		gdImageFilledArc(daily_im, point->x, point->y, 5, 5, 0, 360, dcolor, gdArc);
 
 	/* Save to file. */
 	char *fname = filename("daily.gif", NULL);
