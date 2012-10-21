@@ -133,7 +133,8 @@ static void out_header(FILE *fp)
 	fprintf(fp, " to %s (%d days)<br>\n", cur_date(max_date), days());
 	fprintf(fp, "Generated %s<br>\n", cur_time(time(NULL)));
 	if (yesterday)
-		fprintf(fp, "Yesterday had %lu hits for %.1fM\n", y_hits, m(y_size));
+		fprintf(fp, "Yesterday had %lu hits for %.1fM\n",
+			y_hits, m(y_size));
 	fprintf(fp, "</strong></small>\n<hr>\n");
 	fprintf(fp, "<center>\n\n");
 }
@@ -294,6 +295,20 @@ static void out_hr(FILE *fp)
 	fputs("\n", fp);
 }
 
+static void dump_site(struct site *site, FILE *fp)
+{
+	fprintf(fp, "%-20s%6ld  %3.1f%%\t%6ld  %3.1f%%",
+		site->name, site->hits,
+		(double)site->hits * 100.0 / (double)total_hits,
+		site->size / 1024,
+		(double)site->size * 100.0 / (double)total_size);
+	if (enable_visits)
+		fprintf(fp, "\t%6ld  %3.1f%%",
+			site->visits,
+			(double)site->visits * 100.0 / (double)total_visits);
+	fputc('\n', fp);
+}
+
 static void out_txt(char *fname)
 {
 	int i;
@@ -315,20 +330,9 @@ static void out_txt(char *fname)
 
 	out_hr(fp);
 
-	for (i = 0; i < n_sites; ++i) {
-		if (sites[i].hits == 0)
-			continue;
-		fprintf(fp, "%-20s%6ld  %3.1f%%\t%6ld  %3.1f%%",
-			sites[i].name, sites[i].hits,
-			(double)sites[i].hits * 100.0 / (double)total_hits,
-			sites[i].size / 1024,
-			(double)sites[i].size * 100.0 / (double)total_size);
-		if (enable_visits)
-			fprintf(fp, "\t%6ld  %3.1f%%",
-				sites[i].visits,
-				(double)sites[i].visits * 100.0 / (double)total_visits);
-		fputc('\n', fp);
-	}
+	for (i = 0; i < n_sites; ++i)
+		if (sites[i].hits)
+			dump_site(&sites[i], fp);
 
 	out_hr(fp);
 	fprintf(fp, "%-20s%6ld      \t%6ld",
@@ -366,7 +370,8 @@ static void draw_pie(gdImagePtr im, int cx, int cy, int size)
 			e = s + sites[i].arc;
 
 			for (j = 10; j > 0; j--)
-				gdImageFilledArc(im, cx, cy + j, size, size / 2, s, e, color, gdArc);
+				gdImageFilledArc(im, cx, cy + j, size, size / 2,
+						 s, e, color, gdArc);
 
 			s = e;
 		}
@@ -382,9 +387,11 @@ static void draw_pie(gdImagePtr im, int cx, int cy, int size)
 		e = s + sites[i].arc;
 
 		if (draw_3d)
-			gdImageFilledArc(im, cx, cy, size, size / 2, s, e, color, gdArc);
+			gdImageFilledArc(im, cx, cy, size, size / 2,
+					 s, e, color, gdArc);
 		else
-			gdImageFilledArc(im, cx, cy, size, size, s, e, color, gdArc);
+			gdImageFilledArc(im, cx, cy, size, size,
+					 s, e, color, gdArc);
 
 		s = e;
 	}
@@ -574,16 +581,17 @@ static void out_daily(void)
 		return;
 	}
 
-	/* Now correct the y points. We can't do this until we know max_daily. */
+	/* Now correct the y points. */
 	for (point = points; point; point = point->next) {
-		double factor = (double)point->y / (double)max_daily * D_Y_HEIGHT;
+		double factor;
+		factor = (double)point->y / (double)max_daily * D_Y_HEIGHT;
 		daily_total += point->y;
 		point->y = D_Y - factor;
 	}
 
 	/* Create the image */
 	daily_im = gdImageCreate(D_WIDTH, D_HEIGHT);
-	color = gdImageColorAllocate(daily_im, 0xff, 0xff, 0xff); /* background */
+	color = gdImageColorAllocate(daily_im, 0xff, 0xff, 0xff);
 	gdImageColorTransparent(daily_im, color);
 
 	/* Draw the 25% lines */
@@ -595,8 +603,9 @@ static void out_daily(void)
 	color = gdImageColorAllocate(daily_im, 0, 0, 0xff);
 	double avg = (double)daily_total / (double)n_daily;
 	double factor = avg / (double)max_daily * D_Y_HEIGHT;
-	gdImageLine(daily_im, D_X, D_Y - factor, width, D_Y - factor, color);
-	gdImageLine(daily_im, D_X, D_Y - factor - 1, width, D_Y - factor - 1, color);
+	int y = D_Y - factor;
+	gdImageLine(daily_im, D_X, y, width, y, color);
+	gdImageLine(daily_im, D_X, y - 1, width, y - 1, color);
 	snprintf(maxstr, sizeof(maxstr), "%dM", (unsigned)avg / 1000000);
 	gdImageString(daily_im, gdFontMediumBold,
 		      D_MAXSTR_X, D_Y - factor - 7,
@@ -615,7 +624,8 @@ static void out_daily(void)
 	gdImageLine(daily_im, D_X, D_Y, width, D_Y, color);
 	gdImageLine(daily_im, D_X, D_Y, D_X, D_Y - D_Y_HEIGHT, color);
 	gdImageLine(daily_im, width, D_Y, width, D_Y - D_Y_HEIGHT, color);
-	gdImageLine(daily_im, D_X, D_Y - D_Y_HEIGHT, width, D_Y - D_Y_HEIGHT, color);
+	gdImageLine(daily_im, D_X, D_Y - D_Y_HEIGHT, width, D_Y - D_Y_HEIGHT,
+		    color);
 
 	/* Add the size scale */
 	snprintf(maxstr, sizeof(maxstr), "%dM", max_daily / 1000000);
@@ -625,7 +635,8 @@ static void out_daily(void)
 
 	/* Draw dots last */
 	for (point = points; point; point = point->next)
-		gdImageFilledArc(daily_im, point->x, point->y, 5, 5, 0, 360, dcolor, gdArc);
+		gdImageFilledArc(daily_im, point->x, point->y,
+				 5, 5, 0, 360, dcolor, gdArc);
 
 	/* Save to file. */
 	char *fname = filename("daily.gif", NULL);
@@ -712,7 +723,8 @@ static void update_site(struct site *site, struct log *log)
 		char timestr[16];
 
 		snprintf(timestr, sizeof(timestr), "%04d/%02d/%02d-%03d",
-			 log->tm->tm_year + 1900, log->tm->tm_mon, log->tm->tm_mday,
+			 log->tm->tm_year + 1900,
+			 log->tm->tm_mon, log->tm->tm_mday,
 			 log->tm->tm_yday);
 
 		db_update_count(ddb, timestr, log->size);
@@ -831,9 +843,8 @@ static void get_default_host(void)
 			   "simple-vhost.default-host  = \"%[^\"]", def) == 1) {
 			int i;
 			for (i = 0; i < n_sites; ++i)
-				if (strcmp(sites[i].name, def) == 0) {
+				if (strcmp(sites[i].name, def) == 0)
 					default_host = i;
-				}
 			break;
 		}
 
@@ -855,7 +866,8 @@ static void usage(char *prog, int rc)
 	if (p)
 		prog = p + 1;
 
-	printf("usage: %s [-htvDV] [-d outdir] [-g outgraph] [-o outfile] [-r range]\n"
+	printf("usage: %s [-htvDV] [-d outdir] [-g outgraph]"
+	       " [-o outfile] [-r range]\n"
 	       "\t\t[-I include] [logfile ...]\nwhere:"
 	       "\t-h help\n"
 	       "\t-t enable top ten\n"
@@ -910,7 +922,7 @@ int main(int argc, char *argv[])
 			yesterday = calc_yesterday();
 			break;
 		case 'D':
-			enable_daily=1;
+			enable_daily = 1;
 			break;
 		case 'I':
 			add_list(optarg, &includes);
