@@ -499,38 +499,7 @@ static void out_graphs(void)
 #define D_MAXSTR_Y (D_Y - D_Y_HEIGHT)
 
 static DB *ddb;
-static int max_daily, n_daily, dx, dy, dcolor;
-static gdImagePtr daily_im;
-static unsigned long daily_total;
-
-static void find_max(char *key, void *data, int len)
-{
-	char *p;
-	int yday;
-	static int expected = -1;
-
-	p = strchr(key, '-');
-	if (!p) {
-		printf("Invalid timestr %s\n", key);
-		return;
-	}
-	yday = strtol(p + 1, NULL, 10);
-
-	if (yday >= today)
-		return;
-
-	if (expected != -1)
-		while (expected < yday) {
-			++n_daily;
-			++expected;
-		}
-
-	expected = yday + 1;
-	++n_daily;
-
-	if (*(unsigned long *)data > max_daily)
-		max_daily = *(unsigned long *)data;
-}
+static int max_daily, n_daily;
 
 static void add_point(int x, int y)
 {
@@ -554,105 +523,105 @@ static void add_point(int x, int y)
 
 static void one_daily(char *key, void *data, int len)
 {
-	char *p;
+	static int expected = 400;
+	static int dx = D_X;
 	int yday;
-	static int expected = -1;
 
-	p = strchr(key, '-');
+	char *p = strchr(key, '-');
 	if (!p) {
 		printf("Invalid timestr %s\n", key);
 		return;
 	}
 	yday = strtol(p + 1, NULL, 10);
 
-	if (yday >= today)
+	if (yday == today)
 		return;
 
-	if (expected != -1) {
+	while (expected < yday) {
+		++expected;
+		++n_daily;
 		dx += D_XDELTA;
-		while (expected < yday) {
-			++expected;
-			dx += D_XDELTA;
-		}
 	}
 
-	double factor = (double)(*(int *)data) / (double)max_daily * D_Y_HEIGHT;
-
-	add_point(dx, dy - factor);
+	/* Just add the data for now... we will correct later */
+	add_point(dx, *(int *)data);
 
 	expected = yday + 1;
+	dx += D_XDELTA;
+	++n_daily;
 
-	daily_total += *(unsigned *)data;
+	if (*(unsigned long *)data > max_daily)
+		max_daily = *(unsigned long *)data;
 }
 
 static void out_daily(void)
 {
 	struct point *point;
-	int color, width;
+	int color, dcolor, width, dy;
+	unsigned long daily_total = 0;
 	char maxstr[10];
+	gdImagePtr daily_im;
 
 	if (!enable_daily)
 		return;
 
-	daily_im = gdImageCreate(D_WIDTH, D_HEIGHT);
-	color = gdImageColorAllocate(daily_im, 0xff, 0xff, 0xff); /* background */
-	gdImageColorTransparent(daily_im, color);
-
-	dcolor = gdImageColorAllocate(daily_im, 0xff, 0, 0);
-
-	max_daily = 0;
-	db_walk(ddb, find_max);
-	max_daily = ((max_daily + ROUND - 1) / ROUND) * ROUND;
-
-	width = n_daily * D_XDELTA + D_X - D_XDELTA;
-
-	color = gdImageColorAllocate(daily_im, 0xc0, 0xc0, 0xc0);
-
-	for (dy = D_Y_4 + 20; dy < D_Y_HEIGHT; dy += D_Y_4)
-		gdImageLine(daily_im, D_X, dy, width, dy, color);
-
-	dx = D_X;
-	dy = D_Y;
 	db_walk(ddb, one_daily);
+	max_daily = ((max_daily + ROUND - 1) / ROUND) * ROUND;
+	width = n_daily * D_XDELTA + D_X - D_XDELTA;
 
 	if (!points) {
 		puts("NO POINTS!");
 		return;
 	}
 
+	/* Now correct the y points. We can't do this until we know max_daily. */
+	for (point = points; point; point = point->next) {
+		double factor = (double)point->y / (double)max_daily * D_Y_HEIGHT;
+		daily_total += point->y;
+		point->y = D_Y - factor;
+	}
+
+	/* Create the image */
+	daily_im = gdImageCreate(D_WIDTH, D_HEIGHT);
+	color = gdImageColorAllocate(daily_im, 0xff, 0xff, 0xff); /* background */
+	gdImageColorTransparent(daily_im, color);
+
+	/* Draw the 25% lines */
+	color = gdImageColorAllocate(daily_im, 0xc0, 0xc0, 0xc0);
+	for (dy = D_Y_4 + 20; dy < D_Y_HEIGHT; dy += D_Y_4)
+		gdImageLine(daily_im, D_X, dy, width, dy, color);
+
+	/* Draw the average */
+	color = gdImageColorAllocate(daily_im, 0, 0, 0xff);
+	double avg = (double)daily_total / (double)n_daily;
+	double factor = avg / (double)max_daily * D_Y_HEIGHT;
+	gdImageLine(daily_im, D_X, D_Y - factor, width, D_Y - factor, color);
+	gdImageLine(daily_im, D_X, D_Y - factor - 1, width, D_Y - factor - 1, color);
+	snprintf(maxstr, sizeof(maxstr), "%dM", (unsigned)avg / 1000000);
+	gdImageString(daily_im, gdFontMediumBold,
+		      D_MAXSTR_X, D_Y - factor - 7,
+		      (unsigned char *)maxstr, color);
+
 	/* Draw lines */
+	dcolor = gdImageColorAllocate(daily_im, 0xff, 0, 0);
 	for (point = points->next; point; point = point->next)
 		gdImageLine(daily_im,
 			    point->prev->x, point->prev->y,
 			    point->x, point->y,
 			    dcolor);
 
-	/* Draw average */
-	color = gdImageColorAllocate(daily_im, 0, 0, 0xff);
-	double avg = (double)daily_total / (double)n_daily;
-	double factor = avg / (double)max_daily * D_Y_HEIGHT;
-	gdImageLine(daily_im, D_X, D_Y - factor, width, D_Y - factor, color);
-	gdImageLine(daily_im, D_X, D_Y - factor - 1, width, D_Y - factor - 1, color);
-
-	snprintf(maxstr, sizeof(maxstr), "%dM", (unsigned)avg / 1000000);
-	gdImageString(daily_im, gdFontMediumBold,
-		      D_MAXSTR_X, D_Y - factor - 7,
-		      (unsigned char *)maxstr, color);
-
 	/* Draw box */
 	color = gdImageColorAllocate(daily_im, 0, 0, 0);
+	gdImageLine(daily_im, D_X, D_Y, width, D_Y, color);
+	gdImageLine(daily_im, D_X, D_Y, D_X, D_Y - D_Y_HEIGHT, color);
+	gdImageLine(daily_im, width, D_Y, width, D_Y - D_Y_HEIGHT, color);
+	gdImageLine(daily_im, D_X, D_Y - D_Y_HEIGHT, width, D_Y - D_Y_HEIGHT, color);
 
+	/* Add the size scale */
 	snprintf(maxstr, sizeof(maxstr), "%dM", max_daily / 1000000);
 	gdImageString(daily_im, gdFontMediumBold,
 		      D_MAXSTR_X, D_MAXSTR_Y,
 		      (unsigned char *)maxstr, color);
-
-	gdImageLine(daily_im, D_X, D_Y, width, D_Y, color); // x -axis
-	gdImageLine(daily_im, D_X, D_Y, D_X, D_Y - D_Y_HEIGHT, color); // x -axis
-
-	gdImageLine(daily_im, width, D_Y, width, D_Y - D_Y_HEIGHT, color);
-	gdImageLine(daily_im, D_X, D_Y - D_Y_HEIGHT, width, D_Y - D_Y_HEIGHT, color);
-
 
 	/* Draw dots last */
 	for (point = points; point; point = point->next)
