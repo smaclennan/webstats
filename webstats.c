@@ -361,7 +361,7 @@ static void draw_pie(gdImagePtr im, int cx, int cy, int size)
 		int j;
 
 		s = 0;
-		for (i = n_sites - 1; i >= 0; --i) {
+		for (i = 0; i < n_sites; ++i) {
 			if (sites[i].arc == 0)
 				continue;
 
@@ -375,10 +375,19 @@ static void draw_pie(gdImagePtr im, int cx, int cy, int size)
 
 			s = e;
 		}
+
+		/* correct for arc > 90 and < 180 */
+		if (sites[0].arc > 90 && sites[0].arc < 180) {
+			color = getcolor(im, sites[0].dark);
+
+			for (j = 1; j < 10; ++j)
+				gdImageFilledArc(im, cx, cy + j, size, size / 2,
+						 0, sites[0].arc, color, gdArc);
+		}
 	}
 
 	s = 0;
-	for (i = n_sites - 1; i >= 0; --i) {
+	for (i = 0; i < n_sites; ++i) {
 		if (sites[i].arc == 0)
 			continue;
 
