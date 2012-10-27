@@ -4,10 +4,10 @@ all:	agent parse-logs webstats
 
 agent:	agent.c
 
-parse-logs: parse-logs.o parse.o time.o statsdb.o
+parse-logs: parse-logs.o parse.o time.o is.o statsdb.o
 	gcc -O3 -Wall -o $@ $+ -ldb -lz
 
-webstats: webstats.o parse.o time.o statsdb.o
+webstats: webstats.o parse.o time.o is.o statsdb.o
 	gcc -O3 -Wall -o $@ $+ -lgd -ldb -lz
 
 clean:

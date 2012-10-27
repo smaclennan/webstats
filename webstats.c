@@ -1,4 +1,3 @@
-#define _GNU_SOURCE /* for strcasestr */
 #include "webstats.h"
 
 #include <sys/utsname.h>
@@ -56,7 +55,7 @@ static struct point {
 	struct point *prev, *next;
 } *points;
 
-static int verbose;
+int verbose;
 
 static struct list *includes;
 
@@ -679,50 +678,6 @@ static void add_list(char *name, struct list **head)
 	*head = l;
 }
 
-static int isbrowser(char *who)
-{
-#if 1
-	if (strcasestr(who, "bot") ||
-	    strcasestr(who, "spider") ||
-	    strcasestr(who, "crawl") ||
-	    strcasestr(who, "link")) {
-		if (verbose > 1)
-			puts(who);
-		return 0;
-	}
-#endif
-
-	return 1;
-}
-
-static int ispage(char *url)
-{
-	char fname[4096], *p;
-	int len;
-
-	strcpy(fname, url);
-
-	/* Asking for default page is good */
-	len = strlen(fname);
-	if (len == 0)
-		return 0;
-	if (*(fname + len - 1) == '/')
-		return 1;
-
-	/* Check the extension */
-	p = strrchr(fname, '.');
-	if (!p)
-		return 0;
-
-	if (strncmp(p, ".htm", 4) == 0)
-		return 1;
-
-	if (strcmp(p, ".js") == 0)
-		return 1;
-
-	return 0;
-}
-
 static void update_site(struct site *site, struct log *log)
 {
 	++site->hits;
@@ -739,15 +694,15 @@ static void update_site(struct site *site, struct log *log)
 		db_update_count(ddb, timestr, log->size);
 	}
 
-	if ((enable_pages || enable_visits) && log->status == 200 &&
-	    ispage(log->url) && isbrowser(log->who)) {
+	if (enable_pages && ispage(log))
 		++site->pages;
-		if (enable_visits && db_put(site->ipdb, log->ip) == 0) {
+
+	if (enable_visits && isvisit(log))
+		if (db_put(site->ipdb, log->ip) == 0) {
 			++site->visits;
 			if (verbose)
 				printf("%s: %s\n", site->name, log->ip);
 		}
-	}
 
 	if (enable_topten) {
 		char url[256];
@@ -840,32 +795,25 @@ static void get_hostname(void)
 		strcpy(host, "yow");
 }
 
-static void get_default_host(void)
+static void set_default_host(void)
 {	/* lighttpd specific */
-	char line[128], def[128];
-	FILE *fp = fopen("/etc/lighttpd/lighttpd.conf", "r");
-	if (!fp)
-		return;
+	char def[128];
 
-	while (fgets(line, sizeof(line), fp))
-		if (sscanf(line,
-			   "simple-vhost.default-host  = \"%[^\"]", def) == 1) {
+	if (get_default_host(def, sizeof(def))) {
 			int i;
 			for (i = 0; i < n_sites; ++i)
-				if (strcmp(sites[i].name, def) == 0)
+				if (strcmp(sites[i].name, def) == 0) {
 					default_host = i;
-			break;
-		}
+					break;
+				}
 
-	fclose(fp);
-
-
-	/* default host gets red */
-	if (default_host != 0) {
-		sites[0].color = sites[default_host].color;
-		sites[0].dark = sites[default_host].dark;
-		sites[default_host].color = 0xff0000;
-		sites[default_host].dark = 0x900000;
+			/* default host gets red */
+			if (default_host != 0) {
+				sites[0].color = sites[default_host].color;
+				sites[0].dark = sites[default_host].dark;
+				sites[default_host].color = 0xff0000;
+				sites[default_host].dark = 0x900000;
+			}
 	}
 }
 
@@ -953,7 +901,7 @@ int main(int argc, char *argv[])
 
 	get_hostname();
 
-	get_default_host();
+	set_default_host();
 
 	if (enable_topten) {
 		pages = db_open("pages");

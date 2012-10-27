@@ -13,6 +13,7 @@
 
 #include <db.h>
 
+extern int verbose;
 extern time_t min_date, max_date;
 
 struct log {
@@ -44,6 +45,11 @@ void init_range(int days);
 int in_range(struct log *log);
 void range_fixup(void);
 
+/* helpful is* functions */
+int isbrowser(char *who);
+int ispage(struct log *log);
+int isvisit(struct log *log);
+int get_default_host(char *host, int len);
 
 /* Helpful db functions. */
 void print(char *key, void *data, int len);

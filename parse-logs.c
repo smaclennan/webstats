@@ -2,7 +2,9 @@
 #include "webstats.h"
 
 
-static int verbose;
+int verbose;
+
+static char default_host[40];
 
 /* counts */
 static DB *counts;
@@ -19,63 +21,6 @@ static double total = 0.0;
 /* daily */
 static DB *ddb;
 
-
-#if 0
-static int isabot(char *who)
-{
-	if (strcasestr(who, "bot") ||
-	    strcasestr(who, "spider") ||
-	    strcasestr(who, "crawl") ||
-	    strcasestr(who, "link")) {
-		if (verbose > 1)
-			puts(who);
-		return 1;
-	}
-
-	return 0;
-}
-#endif
-
-#if 0
-static int is_page(char *url)
-{
-	char *p;
-
-	p = url + strlen(url);
-	if (p > url)
-		--p;
-	if (*p == '/')
-		return 1;
-
-	p = strstr(url, "index.html");
-	if (p) {
-		*p = '\0';
-		return 1;
-	}
-
-	/* Check the extension */
-	p = strrchr(url, '.');
-	if (!p)
-		return 0;
-
-	if (strncmp(p, ".htm", 4) == 0)
-		return 1;
-
-	if (strcmp(p, ".js") == 0)
-		return 1;
-
-	return 0;
-}
-#endif
-
-/* Probably only of use to me ;) */
-static int is_seanm_ca(char *host)
-{
-	if (strstr(host, "rippers.ca") || strstr(host, "m38a1.ca"))
-		return 0;
-
-	return 1;
-}
 
 static void process_log(struct log *log)
 {
@@ -119,8 +64,8 @@ static void process_log(struct log *log)
 #endif
 
 		host = log->host;
-		if (is_seanm_ca(host))
-			host = "seanm.ca";
+		if (strcmp(host, "-") == 0)
+			host = default_host;
 
 		int len = snprintf(url, sizeof(url), "%s%s", host, log->url);
 		if (len > max_url)
@@ -250,6 +195,9 @@ int main(int argc, char *argv[])
 			puts("Sorry!");
 			usage(argv[0], 1);
 		}
+
+	if (!get_default_host(default_host, sizeof(default_host)))
+		strcpy(default_host, "seanm.ca");
 
 	if (optind == argc)
 		parse_logfile(NULL, process_log);
