@@ -719,6 +719,10 @@ static void process_log(struct log *log)
 {
 	int i;
 
+	if (strcmp(log->ip, "216.138.233.67") == 0 ||
+	    strncmp(log->ip, "192.168.", 8) == 0)
+		return;
+
 	if (!in_range(log))
 		return;
 

@@ -6,6 +6,9 @@ int verbose;
 
 static char default_host[40];
 
+static int total_hits;
+static int me;
+
 /* counts */
 static DB *counts;
 static int total_count;
@@ -24,8 +27,15 @@ static DB *ddb;
 
 static void process_log(struct log *log)
 {
+	if (strcmp(log->ip, "216.138.233.67") == 0) {
+		++me;
+		return;
+	}
+
 	if (!in_range(log))
 		return;
+
+	++total_hits;
 
 	if (ddb) {
 		char timestr[16];
@@ -217,7 +227,7 @@ int main(int argc, char *argv[])
 
 	if (domains) {
 		puts("Domains:");
-		db_walk(domains, print);
+		db_walk(domains, print_count);
 		db_close(domains, "domains.db");
 	}
 
