@@ -846,7 +846,7 @@ int main(int argc, char *argv[])
 {
 	int i, had_hits;
 
-	while ((i = getopt(argc, argv, "3d:g:ho:r:tvyDI:V")) != EOF)
+	while ((i = getopt(argc, argv, "3d:g:hn:o:r:tvyDI:V")) != EOF)
 		switch (i) {
 		case '3':
 			draw_3d = 1;
@@ -862,6 +862,11 @@ int main(int argc, char *argv[])
 			break;
 		case 'h':
 			usage(argv[0], 0);
+		case 'n':
+			i = strtol(optarg, NULL, 0);
+			if (i < n_sites)
+				n_sites = i;
+			break;
 		case 'o':
 			outfile = optarg;
 			break;
