@@ -974,8 +974,10 @@ int main(int argc, char *argv[])
 		if (sites[i].hits)
 			++had_hits;
 
-	if (had_hits > 1) /* graph of 100% for one site is boring */
-		out_graphs();
+	if (had_hits <= 1)
+		outgraph = NULL; /* graph of 100% for one site is boring */
+
+	out_graphs();
 	out_daily();
 	out_html(filename(outfile, NULL));
 	out_txt(filename(outfile, ".txt"));
