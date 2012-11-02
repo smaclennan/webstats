@@ -124,7 +124,7 @@ static void out_header(FILE *fp)
 		"</head>\n", host);
 
 	/* Body */
-	fprintf(fp, "<body BGCOLOR=\"#E8E8E8\">\n");
+	fprintf(fp, "<body BGCOLOR=\"#C0C0C0\">\n");
 	fprintf(fp, "<h2>Statistics for %s</h2>\n", host);
 	fprintf(fp, "<small><strong>\n");
 	/* Warning: cur_time/date has a local static for buffer */
@@ -207,7 +207,7 @@ static inline void out_count(unsigned long count, unsigned long total, FILE *fp)
 		count, (double)count * 100.0 / (double)total);
 }
 
-static void out_html(char *fname)
+static void out_html(char *fname, int had_hits)
 {
 	int i;
 	FILE *fp = fopen(fname, "w");
@@ -223,40 +223,55 @@ static void out_html(char *fname)
 			"alt=\"Pie Charts\">\n\n",
 			outgraph, width);
 
-	fprintf(fp, "<p><table WIDTH=\"%d%%\" BORDER=1 "
-		"CELLSPACING=1 CELLPADDING=1",
-		enable_pages ? 80 : 60);
-	fprintf(fp, " summary=\"Satistics.\">\n");
+	if (had_hits == 1) {
+		fprintf(fp, "<p><table BORDER=1 CELLPADDING=5");
+		fprintf(fp, " summary=\"Satistics.\">\n");
 
-	fputs("<tr><th>Site<th colspan=2>Hits", fp);
-	if (enable_pages)
-		fputs("<th colspan=2>Pages", fp);
-	if (enable_visits)
-		fputs("<th colspan=2>Visits", fp);
-	fputs("<th colspan=2>Size (M)\n", fp);
 
-	for (i = 0; i < n_sites; ++i) {
-		if (sites[i].hits == 0)
-			continue;
-		fprintf(fp, "<tr><td>%s", sites[i].name);
-		out_count(sites[i].hits, total_hits, fp);
+		fprintf(fp, "<tr><th>Hits<td align=right>%ld", total_hits);
 		if (enable_pages)
-			out_count(sites[i].pages, total_pages, fp);
+			fprintf(fp, "<tr><th>Pages<td align=right>%ld", total_pages);
 		if (enable_visits)
-			out_count(sites[i].visits, total_visits, fp);
-		fprintf(fp, "<td align=right>%.1f<td align=right>%.1f%%\n",
-			(double)sites[i].size / 1024.0,
-			(double)sites[i].size * 100.0 / (double)total_size);
+			fprintf(fp, "<tr><th>Visits<td align=right>%ld", total_visits);
+		fprintf(fp, "<tr><th>Size (M)<td align=right>%ld\n", total_size / 1024);
+
+		fprintf(fp, "</table>\n");
+	} else {
+		fprintf(fp, "<p><table WIDTH=\"%d%%\" BORDER=1 "
+			"CELLSPACING=1 CELLPADDING=1",
+			enable_pages ? 80 : 60);
+		fprintf(fp, " summary=\"Satistics.\">\n");
+
+		fputs("<tr><th>Site<th colspan=2>Hits", fp);
+		if (enable_pages)
+			fputs("<th colspan=2>Pages", fp);
+		if (enable_visits)
+			fputs("<th colspan=2>Visits", fp);
+		fputs("<th colspan=2>Size (M)\n", fp);
+
+		for (i = 0; i < n_sites; ++i) {
+			if (sites[i].hits == 0)
+				continue;
+			fprintf(fp, "<tr><td>%s", sites[i].name);
+			out_count(sites[i].hits, total_hits, fp);
+			if (enable_pages)
+				out_count(sites[i].pages, total_pages, fp);
+			if (enable_visits)
+				out_count(sites[i].visits, total_visits, fp);
+			fprintf(fp, "<td align=right>%.1f<td align=right>%.1f%%\n",
+				(double)sites[i].size / 1024.0,
+				(double)sites[i].size * 100.0 / (double)total_size);
+		}
+
+		fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", total_hits);
+		if (enable_pages)
+			fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_pages);
+		if (enable_visits)
+			fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_visits);
+		fprintf(fp, "<td align=right>%ld<td>&nbsp;\n", total_size / 1024);
+
+		fprintf(fp, "</table>\n");
 	}
-
-	fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", total_hits);
-	if (enable_pages)
-		fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_pages);
-	if (enable_visits)
-		fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_visits);
-	fprintf(fp, "<td align=right>%ld<td>&nbsp;\n", total_size / 1024);
-
-	fprintf(fp, "</table>\n");
 
 	if (enable_daily)
 		fprintf(fp, "<p><img src=\"daily.gif\" alt=\"Daily Graph\">\n");
@@ -603,7 +618,7 @@ static void out_daily(void)
 	gdImageColorTransparent(daily_im, color);
 
 	/* Draw the 25% lines */
-	color = gdImageColorAllocate(daily_im, 0xc0, 0xc0, 0xc0);
+	color = gdImageColorAllocate(daily_im, 0xb0, 0xb0, 0xb0);
 	for (dy = D_Y_4 + 20; dy < D_Y_HEIGHT; dy += D_Y_4)
 		gdImageLine(daily_im, D_X, dy, width, dy, color);
 
@@ -979,7 +994,7 @@ int main(int argc, char *argv[])
 
 	out_graphs();
 	out_daily();
-	out_html(filename(outfile, NULL));
+	out_html(filename(outfile, NULL), had_hits);
 	out_txt(filename(outfile, ".txt"));
 
 	return 0;
