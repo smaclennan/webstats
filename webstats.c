@@ -36,6 +36,7 @@ static struct site {
 	unsigned long arc;
 	unsigned long visits;
 	DB *ipdb;
+	DB *ddb;
 } sites[] = {
 	{ "seanm.ca", 0xff0000, 0x900000 }, /* must be first! */
 	{ "rippers.ca", 0x000080,  0x000050 },
@@ -673,8 +674,6 @@ static void out_daily(void)
 
 	/* Destroy it */
 	gdImageDestroy(daily_im);
-
-	db_close(ddb, "daily.db");
 }
 
 static void add_list(char *name, struct list **head)
@@ -707,6 +706,8 @@ static void update_site(struct site *site, struct log *log)
 			 log->tm->tm_yday);
 
 		db_update_count(ddb, timestr, log->size);
+
+		db_update_count(site->ddb, timestr, log->size);
 	}
 
 	if (enable_pages && ispage(log))
@@ -948,6 +949,17 @@ int main(int argc, char *argv[])
 			printf("Unable to open daily db\n");
 			exit(1);
 		}
+
+		for (i = 0; i < n_sites; ++i) {
+			char dbname[100];
+			snprintf(dbname, sizeof(dbname), "%s-daily.db", sites[i].name);
+			sites[i].ddb = db_open(dbname);
+			if (!sites[i].ddb) {
+				printf("Unable to open site daily db\n");
+				exit(1);
+			}
+		}
+
 		set_today();
 	}
 
@@ -996,6 +1008,16 @@ int main(int argc, char *argv[])
 	out_daily();
 	out_html(filename(outfile, NULL), had_hits);
 	out_txt(filename(outfile, ".txt"));
+
+	if (enable_daily) {
+		db_close(ddb, "daily.db");
+
+		for (i = 0; i < n_sites; ++i) {
+			char dbname[100];
+			snprintf(dbname, sizeof(dbname), "%s-daily.db", sites[i].name);
+			db_close(sites[i].ddb, dbname);
+		}
+	}
 
 	return 0;
 }
