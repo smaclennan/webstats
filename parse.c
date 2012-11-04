@@ -75,7 +75,7 @@ int parse_logfile(char *logfile, void (*func)(struct log *log))
 		/* This first chunk cannot fail */
 		memset(&tm, 0, sizeof(tm));
 		n = sscanf(line,
-			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] %n",
+			   "%s %s - [%d/%[^/]/%d:%d:%d:%d +0000] %n",
 			   ip, host,
 			   &tm.tm_mday, month, &tm.tm_year,
 			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &where);
@@ -210,11 +210,7 @@ time_t parse_date(struct tm *tm, char *month)
 
 	for (tm->tm_mon = 0; tm->tm_mon < 12; ++tm->tm_mon)
 		if (strcmp(months[tm->tm_mon], month) == 0) {
-			this = mktime(tm);
-			if (this == (time_t)-1) {
-				perror("mktime");
-				exit(1);
-			}
+			this = timegm(tm);
 			if (this > max_date)
 				max_date = this;
 			if (this < min_date)

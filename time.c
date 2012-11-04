@@ -9,7 +9,7 @@ char *cur_time(time_t now)
 
 	/* convert to timestamp string */
 	strftime(timestamp, sizeof(timestamp),
-		 "%b %d %Y %H:%M %Z", localtime(&now));
+		 "%b %d %Y %H:%M %Z", gmtime(&now));
 
 	return timestamp;
 }
@@ -19,7 +19,7 @@ char *cur_date(time_t now)
 	static char timestamp[32];
 
 	/* convert to timestamp string */
-	strftime(timestamp, sizeof(timestamp), "%b %d %Y", localtime(&now));
+	strftime(timestamp, sizeof(timestamp), "%b %d %Y", gmtime(&now));
 
 	return timestamp;
 }
@@ -32,7 +32,7 @@ int days(void)
 void init_range(int days)
 {
 	time_t now = time(NULL);
-	struct tm *tm = localtime(&now);
+	struct tm *tm = gmtime(&now);
 
 	tm->tm_hour = 23;
 	tm->tm_min = 59;
@@ -74,11 +74,11 @@ struct tm *calc_yesterday(void)
 {
 	static struct tm ytm;
 	time_t yesterday, now = time(NULL);
-	struct tm *tm = localtime(&now);
+	struct tm *tm = gmtime(&now);
 
 	tm->tm_mday--;
 	yesterday = mktime(tm);
-	tm = localtime(&yesterday);
+	tm = gmtime(&yesterday);
 
 	memcpy(&ytm, tm, sizeof(ytm));
 	return &ytm;

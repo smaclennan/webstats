@@ -876,7 +876,7 @@ static void sort_pages(char *key, void *data, int len)
 static void set_today(void)
 {
 	time_t now = time(NULL);
-	struct tm *tm = localtime(&now);
+	struct tm *tm = gmtime(&now);
 	today = tm->tm_yday;
 }
 
