@@ -83,3 +83,13 @@ struct tm *calc_yesterday(void)
 	memcpy(&ytm, tm, sizeof(ytm));
 	return &ytm;
 }
+
+int time_equal(struct tm *a, struct tm *b)
+{
+	if (a && b)
+		if (a->tm_yday == b->tm_yday)
+			if (a->tm_year == b->tm_year)
+				return 1;
+
+	return 0;
+}

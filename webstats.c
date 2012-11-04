@@ -20,23 +20,29 @@ static int offset = 35;
 static struct tm *yesterday;
 static unsigned long y_hits;
 static unsigned long y_size;
+static unsigned long y_visits;
+static unsigned long y_pages;
 
 static char host[32];
 static int default_host;
 
 static int today; /* today as a yday */
 
+struct stats {
+	unsigned long hits;
+	unsigned long size;
+	unsigned long pages;
+	unsigned long visits;
+};
+
 static struct site {
 	char *name;
 	int color;
 	int dark;
-	unsigned long hits;
-	unsigned long pages;
-	unsigned long size;
 	unsigned long arc;
-	unsigned long visits;
+	struct stats stats;
+	struct stats ystats;
 	DB *ipdb;
-	DB *ddb;
 } sites[] = {
 	{ "seanm.ca", 0xff0000, 0x900000 }, /* must be first! */
 	{ "rippers.ca", 0x000080,  0x000050 },
@@ -79,6 +85,7 @@ static struct {
 static int n_top;
 
 #define m(n)   (((double)(n)) / 1024.0 / 1024.0)
+
 
 /* filename mallocs space, you should free it */
 static char *filename(char *fname, char *ext)
@@ -208,6 +215,47 @@ static inline void out_count(unsigned long count, unsigned long total, FILE *fp)
 		count, (double)count * 100.0 / (double)total);
 }
 
+static void add_yesterday(FILE *fp)
+{
+	int i;
+
+	fprintf(fp, "<p><table WIDTH=\"%d%%\" BORDER=1 "
+		"CELLSPACING=1 CELLPADDING=1",
+		enable_pages ? 80 : 60);
+	fprintf(fp, " summary=\"Satistics.\">\n");
+
+	fprintf(fp, "<tr><th colspan=%d>Yesterday", 5 + (enable_pages * 2) + (enable_visits * 2));
+	fputs("<tr><th>Site<th colspan=2>Hits", fp);
+	if (enable_pages)
+		fputs("<th colspan=2>Pages", fp);
+	if (enable_visits)
+		fputs("<th colspan=2>Visits", fp);
+	fputs("<th colspan=2>Size (M)\n", fp);
+
+	for (i = 0; i < n_sites; ++i) {
+		if (sites[i].ystats.hits == 0)
+			continue;
+		fprintf(fp, "<tr><td>%s", sites[i].name);
+		out_count(sites[i].ystats.hits, y_hits, fp);
+		if (enable_pages)
+			out_count(sites[i].ystats.pages, y_pages, fp);
+		if (enable_visits)
+			out_count(sites[i].ystats.visits, y_visits, fp);
+		fprintf(fp, "<td align=right>%.1f<td align=right>%.1f%%\n",
+			(double)sites[i].ystats.size / 1024.0 / 1024.0,
+			(double)sites[i].ystats.size * 100.0 / (double)y_size);
+	}
+
+	fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", y_hits);
+	if (enable_pages)
+		fprintf(fp, "<td align=right>%ld<td>&nbsp;", y_pages);
+	if (enable_visits)
+		fprintf(fp, "<td align=right>%ld<td>&nbsp;", y_visits);
+	fprintf(fp, "<td align=right>%.1f<td>&nbsp;\n", (double)y_size / 1024.0 / 1024.0);
+
+	fprintf(fp, "</table>\n");
+}
+
 static void out_html(char *fname, int had_hits)
 {
 	int i;
@@ -228,14 +276,26 @@ static void out_html(char *fname, int had_hits)
 		fprintf(fp, "<p><table BORDER=1 CELLPADDING=5");
 		fprintf(fp, " summary=\"Satistics.\">\n");
 
-
-		fprintf(fp, "<tr><th>Hits<td align=right>%ld", total_hits);
-		if (enable_pages)
-			fprintf(fp, "<tr><th>Pages<td align=right>%ld", total_pages);
-		if (enable_visits)
-			fprintf(fp, "<tr><th>Visits<td align=right>%ld", total_visits);
-		fprintf(fp, "<tr><th>Size (M)<td align=right>%ld\n", total_size / 1024);
-
+		if (yesterday) {
+			fputs("<tr><th width=\"33%\"><th width=\"33%\">Total<th width=\"33%\">Yesterday\n", fp);
+			fprintf(fp, "<tr><th>Hits<td align=right>%ld<td align=right>%ld",
+				total_hits, y_hits);
+			if (enable_pages)
+				fprintf(fp, "<tr><th>Pages<td align=right>%ld<td align=right>%ld\n",
+					total_pages, y_pages);
+			if (enable_visits)
+				fprintf(fp, "<tr><th>Visits<td align=right>%ld<td align=right>%ld\n",
+					total_visits, y_visits);
+			fprintf(fp, "<tr><th>Size (M)<td align=right>%ld<td align=right>%ld\n",
+				total_size / 1024, (y_size + 524288) / 1024 / 1024);
+		} else {
+			fprintf(fp, "<tr><th>Hits<td align=right>%ld", total_hits);
+			if (enable_pages)
+				fprintf(fp, "<tr><th>Pages<td align=right>%ld", total_pages);
+			if (enable_visits)
+				fprintf(fp, "<tr><th>Visits<td align=right>%ld", total_visits);
+			fprintf(fp, "<tr><th>Size (M)<td align=right>%ld\n", total_size / 1024);
+		}
 		fprintf(fp, "</table>\n");
 	} else {
 		fprintf(fp, "<p><table WIDTH=\"%d%%\" BORDER=1 "
@@ -251,17 +311,17 @@ static void out_html(char *fname, int had_hits)
 		fputs("<th colspan=2>Size (M)\n", fp);
 
 		for (i = 0; i < n_sites; ++i) {
-			if (sites[i].hits == 0)
+			if (sites[i].stats.hits == 0)
 				continue;
 			fprintf(fp, "<tr><td>%s", sites[i].name);
-			out_count(sites[i].hits, total_hits, fp);
+			out_count(sites[i].stats.hits, total_hits, fp);
 			if (enable_pages)
-				out_count(sites[i].pages, total_pages, fp);
+				out_count(sites[i].stats.pages, total_pages, fp);
 			if (enable_visits)
-				out_count(sites[i].visits, total_visits, fp);
+				out_count(sites[i].stats.visits, total_visits, fp);
 			fprintf(fp, "<td align=right>%.1f<td align=right>%.1f%%\n",
-				(double)sites[i].size / 1024.0,
-				(double)sites[i].size * 100.0 / (double)total_size);
+				(double)sites[i].stats.size / 1024.0,
+				(double)sites[i].stats.size * 100.0 / (double)total_size);
 		}
 
 		fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", total_hits);
@@ -276,6 +336,10 @@ static void out_html(char *fname, int had_hits)
 
 	if (enable_daily)
 		fprintf(fp, "<p><img src=\"daily.gif\" alt=\"Daily Graph\">\n");
+
+
+	if (yesterday && had_hits > 1)
+			add_yesterday(fp);
 
 	while (includes) {
 		add_include(includes->name, fp);
@@ -313,14 +377,14 @@ static void out_hr(FILE *fp)
 static void dump_site(struct site *site, FILE *fp)
 {
 	fprintf(fp, "%-20s%6ld  %3.1f%%\t%6ld  %3.1f%%",
-		site->name, site->hits,
-		(double)site->hits * 100.0 / (double)total_hits,
-		site->size / 1024,
-		(double)site->size * 100.0 / (double)total_size);
+		site->name, site->stats.hits,
+		(double)site->stats.hits * 100.0 / (double)total_hits,
+		site->stats.size / 1024,
+		(double)site->stats.size * 100.0 / (double)total_size);
 	if (enable_visits)
 		fprintf(fp, "\t%6ld  %3.1f%%",
-			site->visits,
-			(double)site->visits * 100.0 / (double)total_visits);
+			site->stats.visits,
+			(double)site->stats.visits * 100.0 / (double)total_visits);
 	fputc('\n', fp);
 }
 
@@ -346,7 +410,7 @@ static void out_txt(char *fname)
 	out_hr(fp);
 
 	for (i = 0; i < n_sites; ++i)
-		if (sites[i].hits)
+		if (sites[i].stats.hits)
 			dump_site(&sites[i], fp);
 
 	out_hr(fp);
@@ -450,7 +514,7 @@ static void out_graphs(void)
 
 	x = offset;
 	for (i = 0; i < n_sites; ++i)
-		if (sites[i].hits) {
+		if (sites[i].stats.hits) {
 			color = getcolor(im, sites[i].color);
 			gdImageString(im, gdFontSmall, x, 220,
 				      (unsigned char *)sites[i].name, color);
@@ -458,7 +522,7 @@ static void out_graphs(void)
 		}
 
 	for (tarc = 0, i = n_sites - 1; i > 0; --i) {
-		sites[i].arc = sites[i].hits * 360 / total_hits;
+		sites[i].arc = sites[i].stats.hits * 360 / total_hits;
 		tarc += sites[i].arc;
 	}
 
@@ -469,7 +533,7 @@ static void out_graphs(void)
 
 	/* Calculate the size arcs */
 	for (tarc = i = 0; i < n_sites; ++i) {
-		sites[i].arc = sites[i].size * 360 / total_size;
+		sites[i].arc = sites[i].stats.size * 360 / total_size;
 		tarc += sites[i].arc;
 	}
 
@@ -481,7 +545,7 @@ static void out_graphs(void)
 	if (enable_visits) {
 		/* Calculate the visit arcs */
 		for (tarc = i = 0; i < n_sites; ++i) {
-			sites[i].arc = sites[i].visits * 360 / total_visits;
+			sites[i].arc = sites[i].stats.visits * 360 / total_visits;
 			tarc += sites[i].arc;
 		}
 
@@ -492,7 +556,7 @@ static void out_graphs(void)
 	} else if (enable_pages) {
 		/* Calculate the pages arcs */
 		for (tarc = i = 0; i < n_sites; ++i) {
-			sites[i].arc = sites[i].pages * 360 / total_pages;
+			sites[i].arc = sites[i].stats.pages * 360 / total_pages;
 			tarc += sites[i].arc;
 		}
 
@@ -694,8 +758,18 @@ static void add_list(char *name, struct list **head)
 
 static void update_site(struct site *site, struct log *log)
 {
-	++site->hits;
-	site->size += log->size;
+	int is_yesterday = time_equal(yesterday, log->tm);
+
+	++site->stats.hits;
+	site->stats.size += log->size;
+
+	if (is_yesterday) {
+		++y_hits;
+		y_size += log->size;
+
+		++site->ystats.hits;
+		site->ystats.size += log->size;
+	}
 
 	if (enable_daily) {
 		char timestr[16];
@@ -706,16 +780,24 @@ static void update_site(struct site *site, struct log *log)
 			 log->tm->tm_yday);
 
 		db_update_count(ddb, timestr, log->size);
-
-		db_update_count(site->ddb, timestr, log->size);
 	}
 
-	if (enable_pages && ispage(log))
-		++site->pages;
+
+	if (enable_pages && ispage(log)) {
+		++site->stats.pages;
+		if (is_yesterday) {
+			++site->ystats.pages;
+			++y_pages;
+		}
+	}
 
 	if (enable_visits && isvisit(log))
 		if (db_put(site->ipdb, log->ip) == 0) {
-			++site->visits;
+			++site->stats.visits;
+			if (is_yesterday) {
+				++y_visits;
+				++site->ystats.visits;
+			}
 			if (verbose)
 				printf("%s: %s\n", site->name, log->ip);
 		}
@@ -741,13 +823,6 @@ static void process_log(struct log *log)
 
 	if (!in_range(log))
 		return;
-
-	if (yesterday &&
-	    yesterday->tm_mon == log->tm->tm_mon &&
-	    yesterday->tm_mday == log->tm->tm_mday) {
-		++y_hits;
-		y_size += log->size;
-	}
 
 	for (i = 1; i < n_sites; ++i)
 		if (strstr(log->host, sites[i].name)) {
@@ -862,7 +937,7 @@ int main(int argc, char *argv[])
 {
 	int i, had_hits;
 
-	while ((i = getopt(argc, argv, "3d:g:hn:o:r:tvyDI:V")) != EOF)
+	while ((i = getopt(argc, argv, "3d:g:hn:o:r:tvyDI:PV")) != EOF)
 		switch (i) {
 		case '3':
 			draw_3d = 1;
@@ -886,11 +961,6 @@ int main(int argc, char *argv[])
 		case 'o':
 			outfile = optarg;
 			break;
-		case 'p':
-			enable_pages = 1;
-			width = 642;
-			offset = 150;
-			break;
 		case 'r':
 			init_range(strtol(optarg, NULL, 10));
 			break;
@@ -908,6 +978,11 @@ int main(int argc, char *argv[])
 			break;
 		case 'I':
 			add_list(optarg, &includes);
+			break;
+		case 'P':
+			enable_pages = 1;
+			width = 642;
+			offset = 150;
 			break;
 		case 'V':
 			enable_visits = 1;
@@ -950,16 +1025,6 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
-		for (i = 0; i < n_sites; ++i) {
-			char dbname[100];
-			snprintf(dbname, sizeof(dbname), "%s-daily.db", sites[i].name);
-			sites[i].ddb = db_open(dbname);
-			if (!sites[i].ddb) {
-				printf("Unable to open site daily db\n");
-				exit(1);
-			}
-		}
-
 		set_today();
 	}
 
@@ -983,11 +1048,11 @@ int main(int argc, char *argv[])
 
 	/* Calculate the totals */
 	for (i = 0; i < n_sites; ++i) {
-		total_hits += sites[i].hits;
-		total_pages += sites[i].pages;
-		total_visits += sites[i].visits;
-		sites[i].size /= 1024; /* convert to k */
-		total_size += sites[i].size;
+		total_hits += sites[i].stats.hits;
+		total_pages += sites[i].stats.pages;
+		total_visits += sites[i].stats.visits;
+		sites[i].stats.size /= 1024; /* convert to k */
+		total_size += sites[i].stats.size;
 	}
 	/* Make sure there are no /0 errors */
 	if (total_hits == 0)
@@ -998,7 +1063,7 @@ int main(int argc, char *argv[])
 		total_size = 1;
 
 	for (had_hits = i = 0; i < n_sites; ++i)
-		if (sites[i].hits)
+		if (sites[i].stats.hits)
 			++had_hits;
 
 	if (had_hits <= 1)
@@ -1009,15 +1074,8 @@ int main(int argc, char *argv[])
 	out_html(filename(outfile, NULL), had_hits);
 	out_txt(filename(outfile, ".txt"));
 
-	if (enable_daily) {
+	if (enable_daily)
 		db_close(ddb, "daily.db");
-
-		for (i = 0; i < n_sites; ++i) {
-			char dbname[100];
-			snprintf(dbname, sizeof(dbname), "%s-daily.db", sites[i].name);
-			db_close(sites[i].ddb, dbname);
-		}
-	}
 
 	return 0;
 }

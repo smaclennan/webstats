@@ -40,6 +40,7 @@ char *cur_time(time_t now);
 char *cur_date(time_t now);
 int days(void);
 struct tm *calc_yesterday(void);
+int time_equal(struct tm *a, struct tm *b);
 
 void init_range(int days);
 int in_range(struct log *log);
