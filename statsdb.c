@@ -137,4 +137,3 @@ void db_close(DB *db, char *fname)
 		unlink(dbname);
 	}
 }
-
