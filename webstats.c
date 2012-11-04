@@ -791,16 +791,16 @@ static void update_site(struct site *site, struct log *log)
 		}
 	}
 
-	if (enable_visits && isvisit(log))
-		if (db_put(site->ipdb, log->ip) == 0) {
-			++site->stats.visits;
-			if (is_yesterday) {
-				++y_visits;
-				++site->ystats.visits;
-			}
-			if (verbose)
-				printf("%s: %s\n", site->name, log->ip);
+
+	if (enable_visits && isvisit(log, site->ipdb)) {
+		++site->stats.visits;
+		if (is_yesterday) {
+			++y_visits;
+			++site->ystats.visits;
 		}
+		if (verbose)
+			printf("%s: %s\n", site->name, log->ip);
+	}
 
 	if (enable_topten) {
 		char url[256];

@@ -1,6 +1,7 @@
 #define _GNU_SOURCE /* for strcasestr */
 #include "webstats.h"
 
+#define VISIT_TIMEOUT (30 * 60) /* 30 minutes in seconds */
 
 int isbrowser(char *who)
 {
@@ -47,15 +48,38 @@ int ispage(struct log *log)
 	return 0;
 }
 
-int isvisit(struct log *log)
+int isvisit(struct log *log, DB *ipdb)
 {
+	time_t lasttime;
+
 	if (log->status != 200)
 		return 0;
 
 	if (!ispage(log))
 		return 0;
 
-	return isbrowser(log->who);
+	if (!isbrowser(log->who))
+		return 0;
+
+	if (!ipdb)
+		return 1; /* success */
+
+	if (db_put_data(ipdb, log->ip, &log->time, sizeof(log->time), DB_NOOVERWRITE) == 0)
+		return 1; /* success - ip not in db */
+
+	if (db_get_data(ipdb, log->ip, &lasttime, sizeof(lasttime)) != sizeof(lasttime)) {
+		puts("DB get failed!");
+		return 0;
+	}
+
+	/* Note: time goes forwards through one file, but backwards through the files */
+	if (abs(log->time - lasttime) < VISIT_TIMEOUT)
+		return 0;
+
+	/* Update db with new time */
+	db_put_data(ipdb, log->ip, &log->time, sizeof(log->time), 0);
+
+	return 1;
 }
 
 int get_default_host(char *host, int len)
