@@ -75,7 +75,7 @@ int parse_logfile(char *logfile, void (*func)(struct log *log))
 		/* This first chunk cannot fail */
 		memset(&tm, 0, sizeof(tm));
 		n = sscanf(line,
-			   "%s %s - [%d/%[^/]/%d:%d:%d:%d +0000] %n",
+			   "%s %s - [%d/%[^/]/%d:%d:%d:%d %*d] %n",
 			   ip, host,
 			   &tm.tm_mday, month, &tm.tm_year,
 			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &where);
