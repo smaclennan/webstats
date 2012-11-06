@@ -817,14 +817,15 @@ static void process_log(struct log *log)
 {
 	int i;
 
-	if (strcmp(log->ip, "216.138.233.67") == 0 ||
+	if (strcmp(log->ip, "216.138.233.67") == 0 || /* yow */
+	    strcmp(log->ip, "216.254.133.2") == 0 || /* work */
 	    strncmp(log->ip, "192.168.", 8) == 0)
 		return;
 
 	if (!in_range(log))
 		return;
 
-	for (i = 1; i < n_sites; ++i)
+	for (i = 0; i < n_sites; ++i)
 		if (strstr(log->host, sites[i].name)) {
 			update_site(&sites[i], log);
 			return;
