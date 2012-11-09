@@ -903,7 +903,7 @@ static void get_hostname(void)
 	struct utsname uts;
 
 	if (uname(&uts) == 0)
-		snprintf(host, sizeof(host), uts.nodename);
+		snprintf(host, sizeof(host), "%s", uts.nodename);
 	else
 		strcpy(host, "yow");
 }
