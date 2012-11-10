@@ -2,6 +2,7 @@
 agent
 parse-logs
 webstats
+libwebstats.a
 TAGS
 
 # Ignore webstats output files
