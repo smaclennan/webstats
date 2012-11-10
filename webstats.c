@@ -28,11 +28,6 @@ static int default_host;
 
 static int today; /* today as a yday */
 
-static struct ignore {
-	char ip[16];
-	struct ignore *next;
-} *ignores;
-
 struct stats {
 	unsigned long hits;
 	unsigned long size;
@@ -818,20 +813,6 @@ static void update_site(struct site *site, struct log *log)
 	}
 }
 
-static int ignore_ip(char *ip)
-{
-	struct ignore *ignore;
-
-	if (strncmp(ip, "192.168.", 8) == 0)
-		return 1;
-
-	for (ignore = ignores; ignore; ignore = ignore->next)
-		if (strcmp(ip, ignore->ip) == 0)
-			return 1;
-
-	return 0;
-}
-
 static void process_log(struct log *log)
 {
 	int i;
@@ -930,22 +911,6 @@ static void set_default_host(void)
 	}
 }
 
-static void ignore(char *ip)
-{
-	static struct ignore *tail;
-	struct ignore *new = calloc(1, sizeof(struct ignore));
-	if (!new) {
-		printf("Out of memory\n");
-		exit(1);
-	}
-	snprintf(new->ip, sizeof(new->ip), "%s", ip);
-	if (ignores)
-		tail->next = new;
-	else
-		ignores = new;
-	tail = new;
-}
-
 static void usage(char *prog, int rc)
 {
 	char *p = strrchr(prog, '/');
@@ -988,7 +953,7 @@ int main(int argc, char *argv[])
 		case 'h':
 			usage(argv[0], 0);
 		case 'i':
-			ignore(optarg);
+			add_ignore(optarg);
 			break;
 		case 'n':
 			i = strtol(optarg, NULL, 0);

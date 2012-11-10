@@ -46,6 +46,9 @@ void init_range(int days);
 int in_range(struct log *log);
 void range_fixup(void);
 
+int ignore_ip(char *ip);
+void add_ignore(char *ip);
+
 /* helpful is* functions */
 int isbrowser(char *who);
 int ispage(struct log *log);

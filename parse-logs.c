@@ -7,7 +7,6 @@ int verbose;
 static char default_host[40];
 
 static int total_hits;
-static int me;
 
 /* counts */
 static DB *counts;
@@ -27,10 +26,8 @@ static DB *ddb;
 
 static void process_log(struct log *log)
 {
-	if (strcmp(log->ip, "216.138.233.67") == 0) {
-		++me;
+	if (ignore_ip(log->ip))
 		return;
-	}
 
 	if (!in_range(log))
 		return;
@@ -163,7 +160,7 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "cdhpr:vD")) != EOF)
+	while ((i = getopt(argc, argv, "cdhi:pr:vD")) != EOF)
 		switch (i) {
 		case 'c':
 			counts = db_open("counts.db");
@@ -181,6 +178,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'h':
 			usage(argv[0], 0);
+		case 'i':
+			add_ignore(optarg);
+			break;
 		case 'p':
 			pages = db_open("pages.db");
 			if (!pages) {
