@@ -16,9 +16,12 @@ static int total_count;
 static DB *domains;
 
 /* pages */
+static int page_type;
+#define PAGE_COUNTS 1
+#define PAGE_SIZES 2
 static DB *pages;
 static int max_url;
-static double total = 0.0;
+static int total_pages;
 
 /* daily */
 static DB *ddb;
@@ -58,6 +61,8 @@ static void process_log(struct log *log)
 		if (p)
 			*p = '\0';
 
+		++total_pages;
+
 #if 0
 		/* By directory */
 		p = log->url;
@@ -78,24 +83,33 @@ static void process_log(struct log *log)
 		if (len > max_url)
 			max_url = len;
 
-		db_update_count(pages, url, log->size);
+		if (page_type == PAGE_SIZES)
+			db_update_count(pages, url, log->size);
+		else
+			db_update_count(pages, url, 1);
 	}
 }
 
-#define TEN 10
 static struct list {
 	char *name;
 	unsigned long size;
-} top[TEN];
-int n_top;
+} *top;
+static int max_top = 10;
+static int n_top;
 
 static void setup_sort(void)
 {
 	int i;
 
+	top = calloc(max_top, sizeof(struct list));
+	if (!top) {
+		puts("Out of memory\n");
+		exit(1);
+	}
+
 	printf("max_url %d\n", max_url);
 	++max_url;
-	for (i = 0; i < TEN; ++i) {
+	for (i = 0; i < max_top; ++i) {
 		top[i].name = calloc(1, max_url);
 		if (!top[i].name) {
 			printf("Out of memory\n");
@@ -117,12 +131,12 @@ static void sort_pages(char *key, void *data, int len)
 			}
 			strcpy(top[i].name, key);
 			top[i].size = size;
-			if (n_top < TEN)
+			if (n_top < max_top)
 				++n_top;
 			return;
 		}
 
-	if (n_top < TEN) {
+	if (n_top < max_top) {
 		strcpy(top[n_top].name, key);
 		top[n_top].size = size;
 		++n_top;
@@ -143,11 +157,12 @@ static void usage(char *prog, int rc)
 	if (p)
 		prog = p + 1;
 
-	printf("usage: %s [-cdhpvD] [-r range] [logfile ...]\nwhere:"
+	printf("usage: %s [-cdhvD] [-p{c|s}[n]] [-r range] [logfile ...]\nwhere:"
 	       "\t-c enable counts\n"
 	       "\t-d enable domains\n"
 	       "\t-h help\n"
-	       "\t-p enable pages\n"
+	       "\t-pc[n] enable top N page counts\n"
+	       "\t-ps[n] enable top N page sizes\n"
 	       "\t-v verbose\n"
 	       "\t-D enable dailies\n"
 	       "Note: range is time in days\n",
@@ -160,7 +175,7 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "cdhi:pr:vD")) != EOF)
+	while ((i = getopt(argc, argv, "cdhi:p:r:vD")) != EOF)
 		switch (i) {
 		case 'c':
 			counts = db_open("counts.db");
@@ -182,6 +197,15 @@ int main(int argc, char *argv[])
 			add_ignore(optarg);
 			break;
 		case 'p':
+			if (*optarg == 'c')
+				page_type = PAGE_COUNTS;
+			else if (*optarg == 's')
+				page_type = PAGE_SIZES;
+			else
+				usage(argv[1], 1);
+			max_top = strtol(optarg + 1, NULL, 10);
+			if (max_top == 0) max_top = 10;
+
 			pages = db_open("pages.db");
 			if (!pages) {
 				printf("Unable to open pages db\n");
@@ -235,13 +259,26 @@ int main(int argc, char *argv[])
 		setup_sort();
 		db_walk(pages, sort_pages);
 
-		for (i = 0; i < n_top; ++i) {
-			double size = m(top[i].size);
-			total += size;
-			printf("%-60s %.1f\n", top[i].name, size);
-		}
+		if (page_type == PAGE_SIZES) {
+			double total = 0.0;
 
-		printf("Total %.1f\n", total);
+			for (i = 0; i < n_top; ++i) {
+				double size = m(top[i].size);
+				total += size;
+				printf("%-60s %.1f\n", top[i].name, size);
+			}
+
+			printf("Total %.1f\n", total);
+		} else {
+			unsigned long total = 0;
+
+			for (i = 0; i < n_top; ++i) {
+				total += top[i].size;
+				printf("%-60s %lu\n", top[i].name, top[i].size);
+			}
+
+			printf("Total %ld/%u\n", total, total_pages);
+		}
 
 		db_close(pages, "pages.db");
 	}
