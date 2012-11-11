@@ -26,6 +26,8 @@ static unsigned long y_pages;
 static char host[32];
 static int default_host;
 
+static char *one_site;
+
 static int today; /* today as a yday */
 
 struct stats {
@@ -760,6 +762,9 @@ static void update_site(struct site *site, struct log *log)
 {
 	int is_yesterday = time_equal(yesterday, log->tm);
 
+	if (one_site && strcmp(site->name, one_site))
+		return;
+
 	++site->stats.hits;
 	site->stats.size += log->size;
 
@@ -936,7 +941,7 @@ int main(int argc, char *argv[])
 {
 	int i, had_hits;
 
-	while ((i = getopt(argc, argv, "3d:g:hi:n:o:r:tvyDI:PV")) != EOF)
+	while ((i = getopt(argc, argv, "3d:g:hi:n:o:r:s:tvyDI:PV")) != EOF)
 		switch (i) {
 		case '3':
 			draw_3d = 1;
@@ -965,6 +970,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'r':
 			init_range(strtol(optarg, NULL, 10));
+			break;
+		case 's':
+			one_site = optarg;
 			break;
 		case 't':
 			enable_topten = 1;
