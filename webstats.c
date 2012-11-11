@@ -297,7 +297,7 @@ static void out_html(char *fname, int had_hits)
 				fprintf(fp, "<tr><th>Pages<td align=right>%ld", total_pages);
 			if (enable_visits)
 				fprintf(fp, "<tr><th>Visits<td align=right>%ld", total_visits);
-			fprintf(fp, "<tr><th>Size (M)<td align=right>%ld\n", total_size / 1024);
+			fprintf(fp, "<tr><th>Size (M)<td align=right>%.1f\n", (double)total_size / 1024.0);
 		}
 		fprintf(fp, "</table>\n");
 	} else {
