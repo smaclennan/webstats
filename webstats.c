@@ -288,8 +288,9 @@ static void out_html(char *fname, int had_hits)
 			if (enable_visits)
 				fprintf(fp, "<tr><th>Visits<td align=right>%ld<td align=right>%ld\n",
 					total_visits, y_visits);
-			fprintf(fp, "<tr><th>Size (M)<td align=right>%ld<td align=right>%ld\n",
-				total_size / 1024, (y_size + 524288) / 1024 / 1024);
+			fprintf(fp, "<tr><th>Size (M)<td align=right>%.1f<td align=right>%.1f\n",
+				(double)total_size / 1024.0,
+				(double)y_size / 1024.0 / 1024.0);
 		} else {
 			fprintf(fp, "<tr><th>Hits<td align=right>%ld", total_hits);
 			if (enable_pages)
@@ -331,7 +332,7 @@ static void out_html(char *fname, int had_hits)
 			fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_pages);
 		if (enable_visits)
 			fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_visits);
-		fprintf(fp, "<td align=right>%ld<td>&nbsp;\n", total_size / 1024);
+		fprintf(fp, "<td align=right>%.1f<td>&nbsp;\n", (double)total_size / 1024.0);
 
 		fprintf(fp, "</table>\n");
 	}
@@ -592,7 +593,7 @@ static void out_graphs(void)
 #define D_HEIGHT (D_Y + 20)
 #define D_Y_4 (D_Y_HEIGHT / 4)
 
-#define D_MAXSTR_X 20
+#define D_MAXSTR_X 15
 #define D_MAXSTR_Y (D_Y - D_Y_HEIGHT)
 
 static DB *ddb;
@@ -696,7 +697,7 @@ static void out_daily(void)
 	int y = D_Y - factor;
 	gdImageLine(daily_im, D_X, y, width, y, color);
 	gdImageLine(daily_im, D_X, y - 1, width, y - 1, color);
-	snprintf(maxstr, sizeof(maxstr), "%dM", (unsigned)avg / 1000000);
+	snprintf(maxstr, sizeof(maxstr), "%.1fM", (double)avg / 1000000.0);
 	gdImageString(daily_im, gdFontMediumBold,
 		      D_MAXSTR_X, D_Y - factor - 7,
 		      (unsigned char *)maxstr, color);
