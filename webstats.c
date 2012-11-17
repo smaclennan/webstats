@@ -46,10 +46,10 @@ static struct site {
 	struct stats ystats;
 	DB *ipdb;
 } sites[] = {
-	{ "seanm.ca", 0xff0000, 0x900000 }, /* must be first! */
-	{ "rippers.ca", 0x000080,  0x000050 },
-	{ "m38a1.ca", 0xffa500, 0xcf7500 },
-	/* { "emacs", 0xffa500 }, */
+	{ "seanm.ca",	0xff0000, 0x900000 }, /* must be first! */
+	{ "emacs",	0xffa500, 0x900000 },
+	{ "rippers.ca",	0x000080, 0x000050 },
+	{ "m38a1.ca",	0xffa500, 0xcf7500 },
 	/* { "ftp.seanm.ca", 0x00ff00 }, */
 };
 static int n_sites = sizeof(sites) / sizeof(struct site);
@@ -830,7 +830,7 @@ static void process_log(struct log *log)
 		return;
 
 	for (i = 0; i < n_sites; ++i)
-		if (strstr(log->host, sites[i].name)) {
+		if (i != default_host && strstr(log->host, sites[i].name)) {
 			update_site(&sites[i], log);
 			return;
 		}
