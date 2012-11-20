@@ -50,6 +50,7 @@ int ignore_ip(char *ip);
 void add_ignore(char *ip);
 
 /* helpful is* functions */
+int isbot(char *who);
 int isbrowser(char *who);
 int ispage(struct log *log);
 int isvisit(struct log *log, DB *ipdb);

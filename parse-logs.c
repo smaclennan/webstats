@@ -26,6 +26,7 @@ static int total_pages;
 /* daily */
 static DB *ddb;
 
+static int bots;
 
 static void process_log(struct log *log)
 {
@@ -34,6 +35,9 @@ static void process_log(struct log *log)
 
 	if (!in_range(log))
 		return;
+
+	if (isbot(log->who))
+		++bots;
 
 	++total_hits;
 
@@ -289,6 +293,8 @@ int main(int argc, char *argv[])
 		db_close(counts, "counts");
 		printf("Total: %d\n", total_count);
 	}
+
+	printf("Bots %d/%d %.1f%%\n", bots, total_hits, (double)bots / (double)total_hits * 100.0);
 
 	return 0;
 }

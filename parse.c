@@ -86,30 +86,24 @@ int parse_logfile(char *logfile, void (*func)(struct log *log))
 			s = line + where;
 
 		/* The URL line can be ugly - check normal case first */
-		n = sscanf(s, "\"%s %s HTTP/1.%*d\" %d %s \"%n",
-			   method, url, &status, sstr, &where);
-		if (n != 4) {
-			*url = '\0';
-			/* Check for empty URL */
-			n = sscanf(s, "\"%s HTTP/1.%*d\" %d %s \"%n",
-				   method, &status, sstr, &where);
-			if (n != 3) {
-				/* Check for empty string */
-				n = sscanf(s, "\"\" %d %s \"%n",
-					   &status, sstr, &where);
-				if (n != 2) {
+		if (sscanf(s, "\"%s %s HTTP/1.%*d\" %d %s \"%n",
+			   method, url, &status, sstr, &where) != 4)
+			if (sscanf(s, "\"%[^\"]\" %d %s \"%n",
+				   url, &status, sstr, &where) != 3) {
+				*url = '\0';
+				if (sscanf(s, "\"\" %d %s \"%n",
+					   &status, sstr, &where) != 2) {
 					printf("%d: Error %s", log.lineno, line);
 					continue;
 				}
 			}
-		}
 
 		/* This handles a '-' in the size field */
 		size = strtol(sstr, NULL, 10);
 
 		/* People seem to like to embed quotes in the refer
 		 * and who strings :( */
-		s = line + where;
+		s = s + where;
 		e = strchr(s, '"');
 		while (e && *(e + 1) != ' ')
 			e = strchr(e + 1, '"');
@@ -123,6 +117,8 @@ int parse_logfile(char *logfile, void (*func)(struct log *log))
 
 		/* Warning the who will contains the quotes. */
 		snprintf(who, sizeof(who), "%s", e + 2);
+		e = strrchr(who, '\n');
+		if (e) *e = '\0';
 
 		log.time = parse_date(&tm, month);
 

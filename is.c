@@ -3,20 +3,32 @@
 
 #define VISIT_TIMEOUT (30 * 60) /* 30 minutes in seconds */
 
-int isbrowser(char *who)
+int isbot(char *who)
 {
-#if 1
 	if (strcasestr(who, "bot") ||
 	    strcasestr(who, "spider") ||
 	    strcasestr(who, "crawl") ||
 	    strcasestr(who, "link")) {
 		if (verbose > 1)
 			puts(who);
-		return 0;
+		return 1;
 	}
-#endif
 
-	return 1;
+	return 0;
+}
+
+/* Usually you will want to call isbot first.
+ * Nowhere near complete... just catches the big ones.
+ */
+int isbrowser(char *who)
+{
+	if (*who == '"') ++who;
+	if (strncmp(who, "Mozilla", 7) == 0 ||
+	    strncmp(who, "Opera", 5) == 0 ||
+	    strncmp(who, "Safari", 6) == 0)
+		return 1;
+
+	return 0;
 }
 
 int ispage(struct log *log)
@@ -65,7 +77,7 @@ int isvisit(struct log *log, DB *ipdb)
 	if (!ispage(log))
 		return 0;
 
-	if (!isbrowser(log->who))
+	if (isbot(log->who))
 		return 0;
 
 	if (!ipdb)
