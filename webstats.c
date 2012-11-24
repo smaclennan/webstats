@@ -47,8 +47,8 @@ static struct site {
 	DB *ipdb;
 } sites[] = {
 	{ "seanm.ca",	0xff0000, 0x900000 }, /* must be first! */
-	{ "emacs",	0x66cc00, 0x009900 },
-	{ "m38a1.ca",	0xffa500, 0xcf7500 },
+	{ "m38a1.ca",	0x8d9e83, 0x7d8e73 },
+	{ "emacs",	0xffa500, 0xcf7500 },
 	{ "rippers.ca",	0x000080, 0x000050 },
 	/* { "ftp.seanm.ca", 0x00ff00 }, */
 };
