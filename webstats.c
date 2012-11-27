@@ -50,6 +50,7 @@ static struct site {
 	{ "m38a1.ca",	0x8d9e83, 0x7d8e73 },
 	{ "emacs",	0xffa500, 0xcf7500 },
 	{ "rippers.ca",	0x000080, 0x000050 },
+	{ "sam-i-am",   0xffffff, 0x000000 },
 	/* { "ftp.seanm.ca", 0x00ff00 }, */
 };
 static int n_sites = sizeof(sites) / sizeof(struct site);
