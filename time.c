@@ -74,11 +74,11 @@ struct tm *calc_yesterday(void)
 {
 	static struct tm ytm;
 	time_t yesterday, now = time(NULL);
-	struct tm *tm = gmtime(&now);
+	struct tm *tm = localtime(&now);
 
 	tm->tm_mday--;
 	yesterday = mktime(tm);
-	tm = gmtime(&yesterday);
+	tm = localtime(&yesterday);
 
 	memcpy(&ytm, tm, sizeof(ytm));
 	return &ytm;
