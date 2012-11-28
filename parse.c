@@ -68,10 +68,6 @@ int parse_logfile(char *logfile, void (*func)(struct log *log))
 
 		++log.lineno;
 
-		/* Don't count local access. */
-		if (strncmp(line, "192.168.", 8) == 0)
-			continue;
-
 		/* This first chunk cannot fail */
 		memset(&tm, 0, sizeof(tm));
 		n = sscanf(line,
