@@ -214,8 +214,11 @@ static void add_include(char *fname, FILE *out)
 
 static inline void out_count(unsigned long count, unsigned long total, FILE *fp)
 {
-	fprintf(fp, "<td align=right>%lu<td align=right>%.1f%%",
-		count, (double)count * 100.0 / (double)total);
+	if (count)
+		fprintf(fp, "<td align=right>%lu<td align=right>%.1f%%",
+			count, (double)count * 100.0 / (double)total);
+	else
+		fprintf(fp, "<td align=right>0<td align=right>0%%");
 }
 
 static void add_yesterday(FILE *fp)
