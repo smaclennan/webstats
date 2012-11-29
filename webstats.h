@@ -32,7 +32,7 @@ struct log {
 
 int parse_logfile(char *logfile, void (*func)(struct log *log));
 void parse_gopher_log(char *logfile, void (*func)(struct log *log));
-time_t parse_date(struct tm *tm, char *month);
+void dump_log(struct log *log);
 
 
 /* time functions */

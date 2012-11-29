@@ -6,6 +6,7 @@
 
 time_t min_date = 0x7fffffff, max_date;
 
+static time_t parse_date(struct tm *tm, char *month);
 
 static inline gzFile my_fopen(char *logfile)
 {
@@ -194,7 +195,7 @@ static char *months[12] = {
 	"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
-time_t parse_date(struct tm *tm, char *month)
+static time_t parse_date(struct tm *tm, char *month)
 {
 	time_t this;
 
@@ -213,3 +214,24 @@ time_t parse_date(struct tm *tm, char *month)
 	printf("BAD MONTH %s\n", month);
 	exit(1);
 }
+
+void dump_log(struct log *log)
+{
+	printf("%d: %s %s [%d/%s/%d:%d:%d:%d] \"%s %s\" %d %lu \"%s\" \"%s\"\n",
+	       log->lineno,
+	       log->ip,
+	       log->host,
+	       log->tm->tm_mday,
+	       months[log->tm->tm_mon],
+	       log->tm->tm_year,
+	       log->tm->tm_hour,
+	       log->tm->tm_min,
+	       log->tm->tm_sec,
+	       log->method,
+	       log->url,
+	       log->status,
+	       log->size,
+	       log->refer,
+	       log->who);
+}
+
