@@ -67,6 +67,9 @@ int isvisit(struct log *log, DB *ipdb)
 	if (log->status != 200)
 		return 0;
 
+	if (strcmp(log->method, "GET"))
+		return 0;
+
 	if (strstr(log->url, "robot.txt")) {
 		if (verbose)
 			printf("Blacklist %s\n", log->ip);
