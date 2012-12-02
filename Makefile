@@ -1,6 +1,6 @@
 CFLAGS = -Wall -g # -O3
 
-all:	libwebstats.a agent parse-logs webstats
+all:	libwebstats.a agent parse-logs webstats visits
 
 agent:	agent.c
 
@@ -14,5 +14,8 @@ parse-logs: parse-logs.o libwebstats.a
 webstats: webstats.o libwebstats.a
 	gcc -O3 -Wall -o $@ $+ -lgd -ldb -lz
 
+visits: visits.o libwebstats.a
+	gcc -O3 -Wall -o $@ $+ -ldb -lz
+
 clean:
-	rm -f *.o agent parse-logs webstats libwebstats.a TAGS core
+	rm -f *.o agent parse-logs visits webstats libwebstats.a TAGS core

@@ -5,6 +5,7 @@ webstats
 libwebstats.a
 TAGS
 pie
+visits
 
 # Ignore webstats output files
 pie.gif
