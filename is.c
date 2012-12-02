@@ -70,13 +70,6 @@ int isvisit(struct log *log, DB *ipdb)
 	if (strcmp(log->method, "GET"))
 		return 0;
 
-	if (strstr(log->url, "robot.txt")) {
-		if (verbose)
-			printf("Blacklist %s\n", log->ip);
-		db_put_data(ipdb, log->ip, &log->time, sizeof(log->time), 0);
-		return 0;
-	}
-
 	if (!ispage(log))
 		return 0;
 
