@@ -50,7 +50,7 @@ static inline void my_fclose(gzFile fp)
 int parse_logfile(char *logfile, void (*func)(struct log *log))
 {
 	struct log log;
-	char line[MAXLINE], url[MAXLINE], refer[MAXLINE], who[MAXLINE];
+	char line[MAXLINE];
 	gzFile fp = my_fopen(logfile);
 	if (!fp) {
 		perror(logfile);
@@ -60,6 +60,7 @@ int parse_logfile(char *logfile, void (*func)(struct log *log))
 	memset(&log, 0, sizeof(log));
 
 	while (my_gets(line, sizeof(line), fp)) {
+		char url[MAXLINE], refer[MAXLINE], who[MAXLINE];
 		char ip[20], host[20], month[8], sstr[20], method[20];
 		char *s, *e;
 		int n, where;
@@ -77,7 +78,7 @@ int parse_logfile(char *logfile, void (*func)(struct log *log))
 			   &tm.tm_mday, month, &tm.tm_year,
 			   &tm.tm_hour, &tm.tm_min, &tm.tm_sec, &where);
 		if (n != 8) {
-			printf("%d: Error Internal %s", log.lineno, line);
+			printf("%d: Internal Error %s", log.lineno, line);
 			continue;
 		} else
 			s = line + where;
@@ -101,16 +102,15 @@ int parse_logfile(char *logfile, void (*func)(struct log *log))
 		/* People seem to like to embed quotes in the refer
 		 * and who strings :( */
 		s = s + where;
-		e = strchr(s, '"');
+		snprintf(refer, sizeof(refer), "%s", s);
+		e = strchr(refer, '"');
 		while (e && *(e + 1) != ' ')
 			e = strchr(e + 1, '"');
 		if (!e) {
 			printf("%d: Error %s", log.lineno, line);
 			continue;
 		}
-
 		*e = '\0';
-		snprintf(refer, sizeof(refer), "%s", s);
 
 		/* Warning the who will contains the quotes. */
 		snprintf(who, sizeof(who), "%s", e + 2);
