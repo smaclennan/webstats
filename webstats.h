@@ -18,6 +18,7 @@ extern time_t min_date, max_date;
 
 struct log {
 	int lineno;
+	const char *line;
 	char *ip;
 	char *host;
 	struct tm *tm;

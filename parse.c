@@ -131,6 +131,7 @@ int parse_logfile(char *logfile, void (*func)(struct log *log))
 		log.size = size;
 		log.refer = refer;
 		log.who = who;
+		log.line = line;
 
 		if (func)
 			(*func)(&log);
@@ -234,4 +235,3 @@ void dump_log(struct log *log)
 	       log->refer,
 	       log->who);
 }
-
