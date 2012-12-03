@@ -143,11 +143,11 @@ static void out_header(FILE *fp)
 	/* Warning: cur_time/date has a local static for buffer */
 	fprintf(fp, "Summary Period: %s", cur_date(min_date));
 	fprintf(fp, " to %s (%d days)<br>\n", cur_date(max_date), days());
-	fprintf(fp, "Generated %s<br>\n", cur_time(time(NULL)));
+	fprintf(fp, "Generated %s\n", cur_time(time(NULL)));
 	if (yesterday)
-		fprintf(fp, "Yesterday had %lu hits for %.1fM\n",
+		fprintf(fp, "<br>Yesterday had %lu hits for %.1fM\n",
 			y_hits, m(y_size));
-	fprintf(fp, "Bots %.1f%%\n", (double)bots * 100.0 / (double)total_hits);
+	fprintf(fp, "<br>Bots %.1f%%\n", (double)bots * 100.0 / (double)total_hits);
 	fprintf(fp, "</strong></small>\n<hr>\n");
 	fprintf(fp, "<center>\n\n");
 }
