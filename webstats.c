@@ -74,6 +74,8 @@ static unsigned long total_pages;
 static unsigned long total_size;
 static unsigned long total_visits;
 
+static unsigned long bots;
+
 static char *outdir;
 static char *outfile = "stats.html";
 static char *outgraph = "pie.gif";
@@ -145,6 +147,7 @@ static void out_header(FILE *fp)
 	if (yesterday)
 		fprintf(fp, "Yesterday had %lu hits for %.1fM\n",
 			y_hits, m(y_size));
+	fprintf(fp, "Bots %.1f%%\n", (double)bots * 100.0 / (double)total_hits);
 	fprintf(fp, "</strong></small>\n<hr>\n");
 	fprintf(fp, "<center>\n\n");
 }
@@ -772,6 +775,9 @@ static void update_site(struct site *site, struct log *log)
 
 	++site->stats.hits;
 	site->stats.size += log->size;
+
+	if (isbot(log->who))
+		++bots;
 
 	if (is_yesterday) {
 		++y_hits;
