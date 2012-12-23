@@ -3,6 +3,8 @@
 int verbose;
 static char *host;
 
+static DB *ipdb;
+
 static void process_log(struct log *log)
 {
 	if (ignore_ip(log->ip))
@@ -11,7 +13,7 @@ static void process_log(struct log *log)
 	if (host && strstr(log->host, host) == NULL)
 		return;
 
-	if (isvisit(log, NULL))
+	if (isvisit(log, ipdb))
 		puts(log->line);
 }
 
@@ -19,13 +21,20 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "h:i:v")) != EOF)
+	while ((i = getopt(argc, argv, "h:i:uv")) != EOF)
 		switch (i) {
 		case 'h':
 			host = optarg;
 			break;
 		case 'i':
 			add_ignore(optarg);
+			break;
+		case 'u':
+			ipdb = db_open("ipdb");
+			if (!ipdb) {
+				printf("Unable to open ip db\n");
+				exit(1);
+			}
 			break;
 		case 'v':
 			++verbose;
@@ -43,6 +52,9 @@ int main(int argc, char *argv[])
 				printf("Parsing %s...\n", argv[i]);
 			parse_logfile(argv[i], process_log);
 		}
+
+	if (ipdb)
+		db_close(ipdb, "ipdb");
 
 	return 0;
 }
