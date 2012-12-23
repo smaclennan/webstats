@@ -2,7 +2,7 @@
 
 int verbose;
 static char *host;
-
+static struct tm *yesterday;
 static DB *ipdb;
 
 static void process_log(struct log *log)
@@ -13,15 +13,18 @@ static void process_log(struct log *log)
 	if (host && strstr(log->host, host) == NULL)
 		return;
 
+	if (yesterday && !time_equal(yesterday, log->tm))
+		return;
+
 	if (isvisit(log, ipdb))
-		puts(log->line);
+		fputs(log->line, stdout);
 }
 
 int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "h:i:uv")) != EOF)
+	while ((i = getopt(argc, argv, "h:i:uvy")) != EOF)
 		switch (i) {
 		case 'h':
 			host = optarg;
@@ -35,6 +38,9 @@ int main(int argc, char *argv[])
 				printf("Unable to open ip db\n");
 				exit(1);
 			}
+			break;
+		case 'y':
+			yesterday = calc_yesterday();
 			break;
 		case 'v':
 			++verbose;
