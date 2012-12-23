@@ -61,6 +61,7 @@ int get_default_host(char *host, int len);
 void print(char *key, void *data, int len);
 void print_count(char *key, void *data, int len);
 DB *db_open(char *fname);
+DB *db_open_flags(char *fname, int flags);
 int db_get_data(DB *db, char *key, void *data, int len);
 int db_put_data(DB *db, char *key, void *data, int len, int flags);
 int db_update_count(DB *db, char *str, unsigned long i);
@@ -70,6 +71,11 @@ void db_close(DB *db, char *fname);
 static inline int db_put(DB *db, char *str)
 {
 	return db_put_data(db, str, NULL, 0, DB_NOOVERWRITE);
+}
+
+static inline int db_get(DB *db, char *str)
+{
+	return db_get_data(db, str, NULL, 0);
 }
 
 #endif

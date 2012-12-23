@@ -10,12 +10,12 @@ void print_count(char *key, void *data, int len)
 	printf("%s %lu\n", key, *(unsigned long *)data);
 }
 
-DB *db_open(char *fname)
+DB *db_open_flags(char *fname, int flags)
 {
 	char dbname[128];
 	DB *db;
 
-	if (*fname == '/')
+	if (strchr(fname, '/'))
 		snprintf(dbname, sizeof(dbname), "%s", fname);
 	else
 		snprintf(dbname, sizeof(dbname), "/dev/shm/%s", fname);
@@ -26,12 +26,17 @@ DB *db_open(char *fname)
 	}
 
 	if (db->open(db, NULL, dbname, NULL,
-		     DB_BTREE, DB_CREATE | DB_TRUNCATE, 0664)) {
+		     DB_BTREE, flags, 0664)) {
 		printf("db_open failed\n");
 		return NULL;
 	}
 
 	return db;
+}
+
+DB *db_open(char *fname)
+{
+	return db_open_flags(fname, DB_CREATE | DB_TRUNCATE);
 }
 
 int db_get_data(DB *db, char *key, void *data, int len)
