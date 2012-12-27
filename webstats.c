@@ -10,7 +10,6 @@
 
 /* Visits takes no more time on YOW. */
 static int enable_visits;
-static int enable_pages;
 static int enable_daily;
 static int draw_3d;
 static int width = 422;
@@ -20,7 +19,6 @@ static struct tm *yesterday;
 static unsigned long y_hits;
 static unsigned long y_size;
 static unsigned long y_visits;
-static unsigned long y_pages;
 
 static char host[32];
 static int default_host;
@@ -32,7 +30,6 @@ static int today; /* today as a yday */
 struct stats {
 	unsigned long hits;
 	unsigned long size;
-	unsigned long pages;
 	unsigned long visits;
 };
 
@@ -70,7 +67,6 @@ int verbose;
 static struct list *includes;
 
 static unsigned long total_hits;
-static unsigned long total_pages;
 static unsigned long total_size;
 static unsigned long total_visits;
 
@@ -219,15 +215,12 @@ static void add_yesterday(FILE *fp)
 {
 	int i;
 
-	fprintf(fp, "<p><table WIDTH=\"%d%%\" BORDER=1 "
-		"CELLSPACING=1 CELLPADDING=1",
-		enable_pages ? 80 : 60);
+	fprintf(fp, "<p><table WIDTH=\"60%%\" BORDER=1 "
+		"CELLSPACING=1 CELLPADDING=1");
 	fprintf(fp, " summary=\"Satistics.\">\n");
 
-	fprintf(fp, "<tr><th colspan=%d>Yesterday", 5 + (enable_pages * 2) + (enable_visits * 2));
+	fprintf(fp, "<tr><th colspan=%d>Yesterday", 5 + (enable_visits * 2));
 	fputs("<tr><th>Site<th colspan=2>Hits", fp);
-	if (enable_pages)
-		fputs("<th colspan=2>Pages", fp);
 	if (enable_visits)
 		fputs("<th colspan=2>Visits", fp);
 	fputs("<th colspan=2>Size (M)\n", fp);
@@ -237,8 +230,6 @@ static void add_yesterday(FILE *fp)
 			continue;
 		fprintf(fp, "<tr><td>%s", sites[i].name);
 		out_count(sites[i].ystats.hits, y_hits, fp);
-		if (enable_pages)
-			out_count(sites[i].ystats.pages, y_pages, fp);
 		if (enable_visits)
 			out_count(sites[i].ystats.visits, y_visits, fp);
 		fprintf(fp, "<td align=right>%.1f<td align=right>%.1f%%\n",
@@ -247,8 +238,6 @@ static void add_yesterday(FILE *fp)
 	}
 
 	fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", y_hits);
-	if (enable_pages)
-		fprintf(fp, "<td align=right>%ld<td>&nbsp;", y_pages);
 	if (enable_visits)
 		fprintf(fp, "<td align=right>%ld<td>&nbsp;", y_visits);
 	fprintf(fp, "<td align=right>%.1f<td>&nbsp;\n", (double)y_size / 1024.0 / 1024.0);
@@ -280,9 +269,6 @@ static void out_html(char *fname, int had_hits)
 			fputs("<tr><th width=\"33%\"><th width=\"33%\">Total<th width=\"33%\">Yesterday\n", fp);
 			fprintf(fp, "<tr><th>Hits<td align=right>%ld<td align=right>%ld",
 				total_hits, y_hits);
-			if (enable_pages)
-				fprintf(fp, "<tr><th>Pages<td align=right>%ld<td align=right>%ld\n",
-					total_pages, y_pages);
 			if (enable_visits)
 				fprintf(fp, "<tr><th>Visits<td align=right>%ld<td align=right>%ld\n",
 					total_visits, y_visits);
@@ -291,22 +277,17 @@ static void out_html(char *fname, int had_hits)
 				(double)y_size / 1024.0 / 1024.0);
 		} else {
 			fprintf(fp, "<tr><th>Hits<td align=right>%ld", total_hits);
-			if (enable_pages)
-				fprintf(fp, "<tr><th>Pages<td align=right>%ld", total_pages);
 			if (enable_visits)
 				fprintf(fp, "<tr><th>Visits<td align=right>%ld", total_visits);
 			fprintf(fp, "<tr><th>Size (M)<td align=right>%.1f\n", (double)total_size / 1024.0);
 		}
 		fprintf(fp, "</table>\n");
 	} else {
-		fprintf(fp, "<p><table WIDTH=\"%d%%\" BORDER=1 "
-			"CELLSPACING=1 CELLPADDING=1",
-			enable_pages ? 80 : 60);
+		fprintf(fp, "<p><table WIDTH=\"60%%\" BORDER=1 "
+			"CELLSPACING=1 CELLPADDING=1");
 		fprintf(fp, " summary=\"Satistics.\">\n");
 
 		fputs("<tr><th>Site<th colspan=2>Hits", fp);
-		if (enable_pages)
-			fputs("<th colspan=2>Pages", fp);
 		if (enable_visits)
 			fputs("<th colspan=2>Visits", fp);
 		fputs("<th colspan=2>Size (M)\n", fp);
@@ -316,8 +297,6 @@ static void out_html(char *fname, int had_hits)
 				continue;
 			fprintf(fp, "<tr><td>%s", sites[i].name);
 			out_count(sites[i].stats.hits, total_hits, fp);
-			if (enable_pages)
-				out_count(sites[i].stats.pages, total_pages, fp);
 			if (enable_visits)
 				out_count(sites[i].stats.visits, total_visits, fp);
 			fprintf(fp, "<td align=right>%.1f<td align=right>%.1f%%\n",
@@ -326,8 +305,6 @@ static void out_html(char *fname, int had_hits)
 		}
 
 		fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", total_hits);
-		if (enable_pages)
-			fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_pages);
 		if (enable_visits)
 			fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_visits);
 		fprintf(fp, "<td align=right>%.1f<td>&nbsp;\n", (double)total_size / 1024.0);
@@ -532,17 +509,6 @@ static void out_graphs(void)
 		/* Calculate the visit arcs */
 		for (tarc = i = 0; i < n_sites; ++i) {
 			sites[i].arc = sites[i].stats.visits * 360 / total_visits;
-			tarc += sites[i].arc;
-		}
-
-		/* Compensate the first arc */
-		sites[0].arc += 360 - tarc;
-
-		draw_pie(im, 540, 100, 198);
-	} else if (enable_pages) {
-		/* Calculate the pages arcs */
-		for (tarc = i = 0; i < n_sites; ++i) {
-			sites[i].arc = sites[i].stats.pages * 360 / total_pages;
 			tarc += sites[i].arc;
 		}
 
@@ -774,16 +740,6 @@ static void update_site(struct site *site, struct log *log)
 		db_update_count(ddb, timestr, log->size);
 	}
 
-
-	if (enable_pages && ispage(log)) {
-		++site->stats.pages;
-		if (is_yesterday) {
-			++site->ystats.pages;
-			++y_pages;
-		}
-	}
-
-
 	if (enable_visits && isvisit(log, site->ipdb)) {
 		++site->stats.visits;
 		if (is_yesterday)
@@ -880,7 +836,7 @@ int main(int argc, char *argv[])
 {
 	int i, had_hits;
 
-	while ((i = getopt(argc, argv, "3d:g:hi:n:o:r:s:vyDI:PV")) != EOF)
+	while ((i = getopt(argc, argv, "3d:g:hi:n:o:r:s:vyDI:V")) != EOF)
 		switch (i) {
 		case '3':
 			draw_3d = 1;
@@ -924,11 +880,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'I':
 			add_list(optarg, &includes);
-			break;
-		case 'P':
-			enable_pages = 1;
-			width = 642;
-			offset = 150;
 			break;
 		case 'V':
 			enable_visits = 1;
@@ -983,7 +934,6 @@ int main(int argc, char *argv[])
 	/* Calculate the totals */
 	for (i = 0; i < n_sites; ++i) {
 		total_hits += sites[i].stats.hits;
-		total_pages += sites[i].stats.pages;
 		total_visits += sites[i].stats.visits;
 		sites[i].stats.size /= 1024; /* convert to k */
 		total_size += sites[i].stats.size;
