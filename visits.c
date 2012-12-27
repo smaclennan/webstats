@@ -1,6 +1,7 @@
 #include "webstats.h"
 
 int verbose;
+static int clickthru;
 static char *host;
 static struct tm *yesterday;
 static DB *ipdb;
@@ -16,7 +17,10 @@ static void process_log(struct log *log)
 	if (yesterday && !time_equal(yesterday, log->tm))
 		return;
 
-	if (isvisit(log, ipdb))
+	if (clickthru) {
+		if (isvisit(log, ipdb) && !isdefault(log))
+			fputs(log->line, stdout);
+	} else if (isvisit(log, ipdb))
 		fputs(log->line, stdout);
 }
 
@@ -24,10 +28,13 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "h:i:uvy")) != EOF)
+	while ((i = getopt(argc, argv, "h:ci:uvy")) != EOF)
 		switch (i) {
 		case 'h':
 			host = optarg;
+			break;
+		case 'c':
+			clickthru = 1;
 			break;
 		case 'i':
 			add_ignore(optarg);

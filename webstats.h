@@ -54,6 +54,7 @@ void add_ignore(char *ip);
 int isbot(char *who);
 int isbrowser(char *who);
 int ispage(struct log *log);
+int isdefault(struct log *log);
 int isvisit(struct log *log, DB *ipdb);
 int get_default_host(char *host, int len);
 

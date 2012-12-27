@@ -31,19 +31,25 @@ int isbrowser(char *who)
 	return 0;
 }
 
+int isdefault(struct log *log)
+{	/* Asking for default page is good */
+	int len = strlen(log->url);
+	if (len == 0)
+		return 1;
+	if (*(log->url + len - 1) == '/')
+		return 1;
+	return 0;
+}
+
 int ispage(struct log *log)
 {
 	char *p;
-	int len;
 
 	if (log->status != 200)
 		return 0;
 
 	/* Asking for default page is good */
-	len = strlen(log->url);
-	if (len == 0)
-		return 1;
-	if (*(log->url + len - 1) == '/')
+	if (isdefault(log))
 		return 1;
 
 	/* Check the extension */

@@ -41,15 +41,16 @@ static struct site {
 	char *name;
 	int color;
 	int dark;
+	int clickthru;
 	unsigned long arc;
 	struct stats stats;
 	struct stats ystats;
 	DB *ipdb;
 } sites[] = {
-	{ "seanm.ca",	0xff0000, 0x900000 }, /* must be first! */
-	{ "m38a1.ca",	0x8d9e83, 0x7d8e73 },
+	{ "seanm.ca",	0xff0000, 0x900000, 1 }, /* must be first! */
+	{ "m38a1.ca",	0x8d9e83, 0x7d8e73, 1 },
 	{ "emacs",	0xffa500, 0xcf7500 },
-	{ "rippers.ca",	0x000080, 0x000050 },
+	{ "rippers.ca",	0x000080, 0x000050, 1 },
 	{ "sam-i-am",   0xffffff, 0x000000 },
 	/* { "ftp.seanm.ca", 0x00ff00 }, */
 };
@@ -810,10 +811,11 @@ static void update_site(struct site *site, struct log *log)
 
 	if (enable_visits && isvisit(log, site->ipdb)) {
 		++site->stats.visits;
-		if (is_yesterday) {
-			++y_visits;
-			++site->ystats.visits;
-		}
+		if (is_yesterday)
+			if (!site->clickthru || !isdefault(log)) {
+				++y_visits;
+				++site->ystats.visits;
+			}
 		if (verbose)
 			printf("%s: %s\n", site->name, log->ip);
 	}
