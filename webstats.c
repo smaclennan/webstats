@@ -11,7 +11,6 @@
 /* Visits takes no more time on YOW. */
 static int enable_visits;
 static int enable_pages;
-static int enable_topten;
 static int enable_daily;
 static int draw_3d;
 static int width = 422;
@@ -80,15 +79,6 @@ static unsigned long bots;
 static char *outdir;
 static char *outfile = "stats.html";
 static char *outgraph = "pie.gif";
-
-static DB *pages;
-static int max_url;
-
-static struct {
-	char *name;
-	unsigned long size;
-} top[TOP_TEN];
-static int n_top;
 
 #define m(n)   (((double)(n)) / 1024.0 / 1024.0)
 
@@ -355,21 +345,6 @@ static void out_html(char *fname, int had_hits)
 	while (includes) {
 		add_include(includes->name, fp);
 		includes = includes->next;
-	}
-
-	if (enable_topten) {
-		fprintf(fp, "<p><table WIDTH=\"%d%%\" BORDER=1 "
-			"CELLSPACING=1 CELLPADDING=1 Summary=\"Top Ten\">",
-			enable_pages ? 80 : 60);
-		fprintf(fp, "<th colspan=2>Top Ten</th>\n");
-
-		for (i = 0; i < n_top; ++i) {
-			double size = m(top[i].size);
-			fprintf(fp, "<tr><td>%s<td align=right>%.1f\n",
-				top[i].name, size);
-		}
-
-		fprintf(fp, "</table>\n");
 	}
 
 	out_trailer(fp);
@@ -819,16 +794,6 @@ static void update_site(struct site *site, struct log *log)
 		if (verbose)
 			printf("%s: %s\n", site->name, log->ip);
 	}
-
-	if (enable_topten) {
-		char url[256];
-		int len;
-
-		len = snprintf(url, sizeof(url), "%s%s", site->name, log->url);
-		if (len > max_url)
-			max_url = len;
-		db_update_count(pages, url, log->size);
-	}
 }
 
 static void process_log(struct log *log)
@@ -849,45 +814,6 @@ static void process_log(struct log *log)
 
 	/* lighttpd defaults to `default_host' for everything else */
 	update_site(&sites[default_host], log);
-}
-
-static void setup_sort(void)
-{
-	int i;
-
-	++max_url; /* Room for NULL */
-	for (i = 0; i < TOP_TEN; ++i) {
-		top[i].name = calloc(1, max_url);
-		if (!top[i].name) {
-			printf("Out of memory\n");
-			exit(1);
-		}
-	}
-}
-
-static void sort_pages(char *key, void *data, int len)
-{
-	int i, j;
-	unsigned long size = *(unsigned long *)data;
-
-	for (i = 0; i < n_top; ++i)
-		if (size > top[i].size) {
-			for (j = n_top - 1; j > i; --j) {
-				strcpy(top[j].name, top[j - 1].name);
-				top[j].size = top[j - 1].size;
-			}
-			strcpy(top[i].name, key);
-			top[i].size = size;
-			if (n_top < TOP_TEN)
-				++n_top;
-			return;
-		}
-
-	if (n_top < TOP_TEN) {
-		strcpy(top[n_top].name, key);
-		top[n_top].size = size;
-		++n_top;
-	}
 }
 
 static void set_today(void)
@@ -954,7 +880,7 @@ int main(int argc, char *argv[])
 {
 	int i, had_hits;
 
-	while ((i = getopt(argc, argv, "3d:g:hi:n:o:r:s:tvyDI:PV")) != EOF)
+	while ((i = getopt(argc, argv, "3d:g:hi:n:o:r:s:vyDI:PV")) != EOF)
 		switch (i) {
 		case '3':
 			draw_3d = 1;
@@ -986,9 +912,6 @@ int main(int argc, char *argv[])
 			break;
 		case 's':
 			one_site = optarg;
-			break;
-		case 't':
-			enable_topten = 1;
 			break;
 		case 'v':
 			++verbose;
@@ -1026,12 +949,6 @@ int main(int argc, char *argv[])
 
 	set_default_host();
 
-	if (enable_topten) {
-		pages = db_open("pages");
-		if (!pages)
-			exit(1);
-	}
-
 	if (enable_visits)
 		for (i = 0; i < n_sites; ++i) {
 			sites[i].ipdb = db_open(sites[i].name);
@@ -1062,12 +979,6 @@ int main(int argc, char *argv[])
 			db_close(sites[i].ipdb, sites[i].name);
 
 	range_fixup();
-
-	if (enable_topten) {
-		setup_sort();
-		db_walk(pages, sort_pages);
-		db_close(pages, "pages");
-	}
 
 	/* Calculate the totals */
 	for (i = 0; i < n_sites; ++i) {
