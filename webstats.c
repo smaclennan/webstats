@@ -15,11 +15,6 @@ static int draw_3d;
 static int width = 422;
 static int offset = 35;
 
-static struct tm *yesterday;
-static unsigned long y_hits;
-static unsigned long y_size;
-static unsigned long y_visits;
-
 static char host[32];
 static int default_host;
 
@@ -32,6 +27,11 @@ struct stats {
 	unsigned long size;
 	unsigned long visits;
 };
+
+static struct tm *yesterday;
+static struct stats ystats;
+
+static struct stats total;
 
 static struct site {
 	char *name;
@@ -65,10 +65,6 @@ static struct point {
 int verbose;
 
 static struct list *includes;
-
-static unsigned long total_hits;
-static unsigned long total_size;
-static unsigned long total_visits;
 
 static unsigned long bots;
 
@@ -133,8 +129,8 @@ static void out_header(FILE *fp)
 	fprintf(fp, "Generated %s\n", cur_time(time(NULL)));
 	if (yesterday)
 		fprintf(fp, "<br>Yesterday had %lu hits for %.1fM\n",
-			y_hits, m(y_size));
-	fprintf(fp, "<br>Bots %.1f%%\n", (double)bots * 100.0 / (double)total_hits);
+			ystats.hits, m(ystats.size));
+	fprintf(fp, "<br>Bots %.1f%%\n", (double)bots * 100.0 / (double)total.hits);
 	fprintf(fp, "</strong></small>\n<hr>\n");
 	fprintf(fp, "<center>\n\n");
 }
@@ -229,18 +225,18 @@ static void add_yesterday(FILE *fp)
 		if (sites[i].ystats.hits == 0)
 			continue;
 		fprintf(fp, "<tr><td>%s", sites[i].name);
-		out_count(sites[i].ystats.hits, y_hits, fp);
+		out_count(sites[i].ystats.hits, ystats.hits, fp);
 		if (enable_visits)
-			out_count(sites[i].ystats.visits, y_visits, fp);
+			out_count(sites[i].ystats.visits, ystats.visits, fp);
 		fprintf(fp, "<td align=right>%.1f<td align=right>%.1f%%\n",
 			(double)sites[i].ystats.size / 1024.0 / 1024.0,
-			(double)sites[i].ystats.size * 100.0 / (double)y_size);
+			(double)sites[i].ystats.size * 100.0 / (double)ystats.size);
 	}
 
-	fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", y_hits);
+	fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", ystats.hits);
 	if (enable_visits)
-		fprintf(fp, "<td align=right>%ld<td>&nbsp;", y_visits);
-	fprintf(fp, "<td align=right>%.1f<td>&nbsp;\n", (double)y_size / 1024.0 / 1024.0);
+		fprintf(fp, "<td align=right>%ld<td>&nbsp;", ystats.visits);
+	fprintf(fp, "<td align=right>%.1f<td>&nbsp;\n", (double)ystats.size / 1024.0 / 1024.0);
 
 	fprintf(fp, "</table>\n");
 }
@@ -268,18 +264,18 @@ static void out_html(char *fname, int had_hits)
 		if (yesterday) {
 			fputs("<tr><th width=\"33%\"><th width=\"33%\">Total<th width=\"33%\">Yesterday\n", fp);
 			fprintf(fp, "<tr><th>Hits<td align=right>%ld<td align=right>%ld",
-				total_hits, y_hits);
+				total.hits, ystats.hits);
 			if (enable_visits)
 				fprintf(fp, "<tr><th>Visits<td align=right>%ld<td align=right>%ld\n",
-					total_visits, y_visits);
+					total.visits, ystats.visits);
 			fprintf(fp, "<tr><th>Size (M)<td align=right>%.1f<td align=right>%.1f\n",
-				(double)total_size / 1024.0,
-				(double)y_size / 1024.0 / 1024.0);
+				(double)total.size / 1024.0,
+				(double)ystats.size / 1024.0 / 1024.0);
 		} else {
-			fprintf(fp, "<tr><th>Hits<td align=right>%ld", total_hits);
+			fprintf(fp, "<tr><th>Hits<td align=right>%ld", total.hits);
 			if (enable_visits)
-				fprintf(fp, "<tr><th>Visits<td align=right>%ld", total_visits);
-			fprintf(fp, "<tr><th>Size (M)<td align=right>%.1f\n", (double)total_size / 1024.0);
+				fprintf(fp, "<tr><th>Visits<td align=right>%ld", total.visits);
+			fprintf(fp, "<tr><th>Size (M)<td align=right>%.1f\n", (double)total.size / 1024.0);
 		}
 		fprintf(fp, "</table>\n");
 	} else {
@@ -296,18 +292,18 @@ static void out_html(char *fname, int had_hits)
 			if (sites[i].stats.hits == 0)
 				continue;
 			fprintf(fp, "<tr><td>%s", sites[i].name);
-			out_count(sites[i].stats.hits, total_hits, fp);
+			out_count(sites[i].stats.hits, total.hits, fp);
 			if (enable_visits)
-				out_count(sites[i].stats.visits, total_visits, fp);
+				out_count(sites[i].stats.visits, total.visits, fp);
 			fprintf(fp, "<td align=right>%.1f<td align=right>%.1f%%\n",
 				(double)sites[i].stats.size / 1024.0,
-				(double)sites[i].stats.size * 100.0 / (double)total_size);
+				(double)sites[i].stats.size * 100.0 / (double)total.size);
 		}
 
-		fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", total_hits);
+		fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", total.hits);
 		if (enable_visits)
-			fprintf(fp, "<td align=right>%ld<td>&nbsp;", total_visits);
-		fprintf(fp, "<td align=right>%.1f<td>&nbsp;\n", (double)total_size / 1024.0);
+			fprintf(fp, "<td align=right>%ld<td>&nbsp;", total.visits);
+		fprintf(fp, "<td align=right>%.1f<td>&nbsp;\n", (double)total.size / 1024.0);
 
 		fprintf(fp, "</table>\n");
 	}
@@ -341,13 +337,13 @@ static void dump_site(struct site *site, FILE *fp)
 {
 	fprintf(fp, "%-20s%6ld  %3.1f%%\t%6ld  %3.1f%%",
 		site->name, site->stats.hits,
-		(double)site->stats.hits * 100.0 / (double)total_hits,
+		(double)site->stats.hits * 100.0 / (double)total.hits,
 		site->stats.size / 1024,
-		(double)site->stats.size * 100.0 / (double)total_size);
+		(double)site->stats.size * 100.0 / (double)total.size);
 	if (enable_visits)
 		fprintf(fp, "\t%6ld  %3.1f%%",
 			site->stats.visits,
-			(double)site->stats.visits * 100.0 / (double)total_visits);
+			(double)site->stats.visits * 100.0 / (double)total.visits);
 	fputc('\n', fp);
 }
 
@@ -378,9 +374,9 @@ static void out_txt(char *fname)
 
 	out_hr(fp);
 	fprintf(fp, "%-20s%6ld      \t%6ld",
-		"Totals", total_hits, total_size / 1024);
+		"Totals", total.hits, total.size / 1024);
 	if (enable_visits)
-		fprintf(fp, "\t\t%6ld", total_visits);
+		fprintf(fp, "\t\t%6ld", total.visits);
 	fputc('\n', fp);
 
 	fclose(fp);
@@ -485,7 +481,7 @@ static void out_graphs(void)
 		}
 
 	for (tarc = 0, i = n_sites - 1; i > 0; --i) {
-		sites[i].arc = sites[i].stats.hits * 360 / total_hits;
+		sites[i].arc = sites[i].stats.hits * 360 / total.hits;
 		tarc += sites[i].arc;
 	}
 
@@ -496,7 +492,7 @@ static void out_graphs(void)
 
 	/* Calculate the size arcs */
 	for (tarc = i = 0; i < n_sites; ++i) {
-		sites[i].arc = sites[i].stats.size * 360 / total_size;
+		sites[i].arc = sites[i].stats.size * 360 / total.size;
 		tarc += sites[i].arc;
 	}
 
@@ -508,7 +504,7 @@ static void out_graphs(void)
 	if (enable_visits) {
 		/* Calculate the visit arcs */
 		for (tarc = i = 0; i < n_sites; ++i) {
-			sites[i].arc = sites[i].stats.visits * 360 / total_visits;
+			sites[i].arc = sites[i].stats.visits * 360 / total.visits;
 			tarc += sites[i].arc;
 		}
 
@@ -722,8 +718,8 @@ static void update_site(struct site *site, struct log *log)
 		++bots;
 
 	if (is_yesterday) {
-		++y_hits;
-		y_size += log->size;
+		++ystats.hits;
+		ystats.size += log->size;
 
 		++site->ystats.hits;
 		site->ystats.size += log->size;
@@ -744,7 +740,7 @@ static void update_site(struct site *site, struct log *log)
 		++site->stats.visits;
 		if (is_yesterday)
 			if (!site->clickthru || !isdefault(log)) {
-				++y_visits;
+				++ystats.visits;
 				++site->ystats.visits;
 			}
 		if (verbose)
@@ -933,18 +929,18 @@ int main(int argc, char *argv[])
 
 	/* Calculate the totals */
 	for (i = 0; i < n_sites; ++i) {
-		total_hits += sites[i].stats.hits;
-		total_visits += sites[i].stats.visits;
+		total.hits += sites[i].stats.hits;
+		total.visits += sites[i].stats.visits;
 		sites[i].stats.size /= 1024; /* convert to k */
-		total_size += sites[i].stats.size;
+		total.size += sites[i].stats.size;
 	}
 	/* Make sure there are no /0 errors */
-	if (total_hits == 0)
-		total_hits = 1;
-	if (total_visits == 0)
-		total_visits = 1;
-	if (total_size == 0)
-		total_size = 1;
+	if (total.hits == 0)
+		total.hits = 1;
+	if (total.visits == 0)
+		total.visits = 1;
+	if (total.size == 0)
+		total.size = 1;
 
 	for (had_hits = i = 0; i < n_sites; ++i)
 		if (sites[i].stats.hits)
