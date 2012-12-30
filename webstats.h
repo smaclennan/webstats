@@ -55,7 +55,7 @@ int isbot(char *who);
 int isbrowser(char *who);
 int ispage(struct log *log);
 int isdefault(struct log *log);
-int isvisit(struct log *log, DB *ipdb);
+int isvisit(struct log *log, DB *ipdb, int clickthru);
 int get_default_host(char *host, int len);
 
 /* Helpful db functions. */

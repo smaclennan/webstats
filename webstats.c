@@ -707,6 +707,7 @@ static void add_list(char *name, struct list **head)
 static void update_site(struct site *site, struct log *log)
 {
 	int is_yesterday = time_equal(yesterday, log->tm);
+	int clickthru = is_yesterday ? site->clickthru : 0; /* SAM for now */
 
 	if (one_site && strcmp(site->name, one_site))
 		return;
@@ -736,13 +737,12 @@ static void update_site(struct site *site, struct log *log)
 		db_update_count(ddb, timestr, log->size);
 	}
 
-	if (enable_visits && isvisit(log, site->ipdb)) {
+	if (enable_visits && isvisit(log, site->ipdb, clickthru)) {
 		++site->stats.visits;
-		if (is_yesterday)
-			if (!site->clickthru || !isdefault(log)) {
-				++ystats.visits;
-				++site->ystats.visits;
-			}
+		if (is_yesterday) {
+			++ystats.visits;
+			++site->ystats.visits;
+		}
 		if (verbose)
 			printf("%s: %s\n", site->name, log->ip);
 	}

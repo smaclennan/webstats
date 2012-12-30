@@ -66,7 +66,7 @@ int ispage(struct log *log)
 	return 0;
 }
 
-int isvisit(struct log *log, DB *ipdb)
+int isvisit(struct log *log, DB *ipdb, int clickthru)
 {
 	time_t lasttime;
 
@@ -77,6 +77,10 @@ int isvisit(struct log *log, DB *ipdb)
 		return 0;
 
 	if (!ispage(log))
+		return 0;
+
+	/* Must check before setting time */
+	if (clickthru && isdefault(log))
 		return 0;
 
 	if (isbot(log->who))
