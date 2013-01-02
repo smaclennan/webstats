@@ -130,7 +130,7 @@ static void out_header(FILE *fp)
 	if (yesterday)
 		fprintf(fp, "<br>Yesterday had %lu hits for %.1fM\n",
 			ystats.hits, m(ystats.size));
-	fprintf(fp, "<br>Bots %.1f%%\n", (double)bots * 100.0 / (double)total.hits);
+	fprintf(fp, "<br>Bots %.0f%%\n", (double)bots * 100.0 / (double)total.hits);
 	fprintf(fp, "</strong></small>\n<hr>\n");
 	fprintf(fp, "<center>\n\n");
 }
@@ -201,7 +201,7 @@ static void add_include(char *fname, FILE *out)
 static inline void out_count(unsigned long count, unsigned long total, FILE *fp)
 {
 	if (count)
-		fprintf(fp, "<td align=right>%lu<td align=right>%.1f%%",
+		fprintf(fp, "<td align=right>%lu<td align=right>%.0f%%",
 			count, (double)count * 100.0 / (double)total);
 	else
 		fprintf(fp, "<td align=right>0<td align=right>0%%");
@@ -228,7 +228,7 @@ static void add_yesterday(FILE *fp)
 		out_count(sites[i].ystats.hits, ystats.hits, fp);
 		if (enable_visits)
 			out_count(sites[i].ystats.visits, ystats.visits, fp);
-		fprintf(fp, "<td align=right>%.1f<td align=right>%.1f%%\n",
+		fprintf(fp, "<td align=right>%.1f<td align=right>%.0f%%\n",
 			(double)sites[i].ystats.size / 1024.0 / 1024.0,
 			(double)sites[i].ystats.size * 100.0 / (double)ystats.size);
 	}
@@ -295,7 +295,7 @@ static void out_html(char *fname, int had_hits)
 			out_count(sites[i].stats.hits, total.hits, fp);
 			if (enable_visits)
 				out_count(sites[i].stats.visits, total.visits, fp);
-			fprintf(fp, "<td align=right>%.1f<td align=right>%.1f%%\n",
+			fprintf(fp, "<td align=right>%.1f<td align=right>%.0f%%\n",
 				(double)sites[i].stats.size / 1024.0,
 				(double)sites[i].stats.size * 100.0 / (double)total.size);
 		}
@@ -335,13 +335,13 @@ static void out_hr(FILE *fp)
 
 static void dump_site(struct site *site, FILE *fp)
 {
-	fprintf(fp, "%-20s%6ld  %3.1f%%\t%6ld  %3.1f%%",
+	fprintf(fp, "%-20s%6ld  %3.0f%%\t%6ld  %3.0f%%",
 		site->name, site->stats.hits,
 		(double)site->stats.hits * 100.0 / (double)total.hits,
 		site->stats.size / 1024,
 		(double)site->stats.size * 100.0 / (double)total.size);
 	if (enable_visits)
-		fprintf(fp, "\t%6ld  %3.1f%%",
+		fprintf(fp, "\t%6ld  %3.0f%%",
 			site->stats.visits,
 			(double)site->stats.visits * 100.0 / (double)total.visits);
 	fputc('\n', fp);
