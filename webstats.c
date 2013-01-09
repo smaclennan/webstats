@@ -6,8 +6,6 @@
 #include <gdfontmb.h>
 #include <gdfonts.h>
 
-#define TOP_TEN 10
-
 /* Visits takes no more time on YOW. */
 static int enable_visits;
 static int enable_daily;
@@ -528,7 +526,7 @@ static void out_graphs(void)
 	gdImageDestroy(im);
 }
 
-#define ROUND 2000000
+#define ROUND 4000000
 #define D_X 50
 #define D_XDELTA 15
 #define D_WIDTH (D_X + (32 - 1) * D_XDELTA + 20)
@@ -707,7 +705,6 @@ static void add_list(char *name, struct list **head)
 static void update_site(struct site *site, struct log *log)
 {
 	int is_yesterday = time_equal(yesterday, log->tm);
-	int clickthru = is_yesterday ? site->clickthru : 0; /* SAM for now */
 
 	if (one_site && strcmp(site->name, one_site))
 		return;
@@ -737,7 +734,7 @@ static void update_site(struct site *site, struct log *log)
 		db_update_count(ddb, timestr, log->size);
 	}
 
-	if (enable_visits && isvisit(log, site->ipdb, clickthru)) {
+	if (enable_visits && isvisit(log, site->ipdb, site->clickthru)) {
 		++site->stats.visits;
 		if (is_yesterday) {
 			++ystats.visits;
