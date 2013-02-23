@@ -1,0 +1,8 @@
+#!/bin/sh
+CWD=$PWD
+if [ ! -f biglog ] ; then
+  zcat /var/log/thttpd*.gz | cat - /var/log/thttpd.log > biglog
+  echo "Remember to rm biglog"
+fi
+
+./agent -c $CWD/botfile -p -b $CWD biglog

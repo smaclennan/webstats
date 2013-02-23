@@ -1,0 +1,21 @@
+CFLAGS = -Wall -g # -O3
+
+all:	libwebstats.a agent parse-logs webstats visits
+
+agent:	agent.c
+
+libwebstats.a: parse.o time.o is.o statsdb.o ignore.o
+	@rm -f $@
+	ar cr $@ $+
+
+parse-logs: parse-logs.o libwebstats.a
+	gcc -O3 -Wall -o $@ $+ -ldb -lz
+
+webstats: webstats.o libwebstats.a
+	gcc -O3 -Wall -o $@ $+ -lgd -ldb -lz
+
+visits: visits.o libwebstats.a
+	gcc -O3 -Wall -o $@ $+ -ldb -lz
+
+clean:
+	rm -f *.o agent parse-logs visits webstats libwebstats.a TAGS core

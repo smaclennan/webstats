@@ -1,0 +1,14 @@
+*.o
+agent
+parse-logs
+webstats
+libwebstats.a
+TAGS
+pie
+visits
+
+# Ignore webstats output files
+pie.gif
+daily.gif
+stats.html
+stats.txt
