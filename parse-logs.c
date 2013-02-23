@@ -7,6 +7,12 @@ int verbose;
 static char default_host[40];
 
 static int total_hits;
+static unsigned total_size;
+
+static int default_hits;
+static unsigned default_size;
+
+static struct tm *yesterday;
 
 /* counts */
 static DB *counts;
@@ -36,10 +42,19 @@ static void process_log(struct log *log)
 	if (!in_range(log))
 		return;
 
-	if (isbot(log->who))
-		++bots;
+	if (yesterday && !time_equal(yesterday, log->tm))
+		return;
 
 	++total_hits;
+	total_size += log->size;
+
+	if (isdefault(log)) {
+		++default_hits;
+		default_size += log->size;
+	}
+
+	if (isbot(log->who))
+		++bots;
 
 	if (ddb) {
 		char timestr[16];
@@ -148,6 +163,7 @@ static void sort_pages(char *key, void *data, int len)
 }
 
 #define m(n)   (((double)(n)) / 1024.0 / 1024.0)
+#define k(n)   (((double)(n)) / 1024.0)
 
 void print_daily(char *key, void *data, int len)
 {
@@ -177,9 +193,9 @@ static void usage(char *prog, int rc)
 
 int main(int argc, char *argv[])
 {
-	int i;
+	int i, yarg = 0;
 
-	while ((i = getopt(argc, argv, "cdhi:p:r:vD")) != EOF)
+	while ((i = getopt(argc, argv, "cdhi:p:r:yvD")) != EOF)
 		switch (i) {
 		case 'c':
 			counts = db_open("counts.db");
@@ -219,6 +235,9 @@ int main(int argc, char *argv[])
 		case 'r':
 			init_range(strtol(optarg, NULL, 10));
 			break;
+		case 'y':
+			++yarg;
+			break;
 		case 'v':
 			++verbose;
 			break;
@@ -233,6 +252,9 @@ int main(int argc, char *argv[])
 			puts("Sorry!");
 			usage(argv[0], 1);
 		}
+
+	if (yarg)
+		yesterday = calc_yesterdays(yarg);
 
 	if (!get_default_host(default_host, sizeof(default_host)))
 		strcpy(default_host, "seanm.ca");
@@ -294,7 +316,11 @@ int main(int argc, char *argv[])
 		printf("Total: %d\n", total_count);
 	}
 
-	printf("Bots %d/%d %.1f%%\n", bots, total_hits, (double)bots / (double)total_hits * 100.0);
+
+	printf("Hits: %d/%d\n", default_hits, total_hits);
+	printf("Size: %.1f/%.1f\n", k(default_size), k(total_size));
+
+//	printf("Bots %d/%d %.1f%%\n", bots, total_hits, (double)bots / (double)total_hits * 100.0);
 
 	return 0;
 }

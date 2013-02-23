@@ -70,18 +70,23 @@ void range_fixup(void)
 	}
 }
 
-struct tm *calc_yesterday(void)
+struct tm *calc_yesterdays(int back)
 {
 	static struct tm ytm;
 	time_t yesterday, now = time(NULL);
 	struct tm *tm = localtime(&now);
 
-	tm->tm_mday--;
+	tm->tm_mday -= back;
 	yesterday = mktime(tm);
 	tm = localtime(&yesterday);
 
 	memcpy(&ytm, tm, sizeof(ytm));
 	return &ytm;
+}
+
+struct tm *calc_yesterday(void)
+{
+	return calc_yesterdays(1);
 }
 
 int time_equal(struct tm *a, struct tm *b)
