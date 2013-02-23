@@ -4,7 +4,7 @@ webstats
 Very simple webserver statistics program.
 
 It shows graphs and stats from a sliding window of the last 31 days
-and optionaly from yesterday.
+and option aly from yesterday.
 
 You should be able to see a live sample at http://seanm.ca/stats/.
 
