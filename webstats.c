@@ -15,6 +15,7 @@ static int offset = 35;
 
 static char host[32];
 static int default_host;
+static int show_bots;
 
 static char *one_site;
 
@@ -41,12 +42,15 @@ static struct site {
 	struct stats ystats;
 	DB *ipdb;
 } sites[] = {
+#if 1
 	{ "seanm.ca",	0xff0000, 0x900000, 1 }, /* must be first! */
 	{ "m38a1.ca",	0x8d9e83, 0x7d8e73, 1 },
 	{ "emacs",	0xffa500, 0xcf7500 },
 	{ "rippers.ca",	0x000080, 0x000050, 1 },
 	{ "sam-i-am",   0xffffff, 0x000000 },
-	/* { "ftp.seanm.ca", 0x00ff00 }, */
+#else
+	{ "sam-i-am",	0xff0000, 0x900000, 1 }, /* must be first! */
+#endif
 };
 static int n_sites = sizeof(sites) / sizeof(struct site);
 
@@ -71,6 +75,7 @@ static char *outfile = "stats.html";
 static char *outgraph = "pie.gif";
 
 #define m(n)   (((double)(n)) / 1024.0 / 1024.0)
+#define k(n)   (((double)(n)) / 1024.0)
 
 
 /* filename mallocs space, you should free it */
@@ -105,7 +110,7 @@ static char *filename(char *fname, char *ext)
 	return out;
 }
 
-static void out_header(FILE *fp)
+static void out_header(FILE *fp, int had_hits)
 {
 	/* Header proper */
 	fprintf(fp,
@@ -125,11 +130,27 @@ static void out_header(FILE *fp)
 	fprintf(fp, "Summary Period: %s", cur_date(min_date));
 	fprintf(fp, " to %s (%d days)<br>\n", cur_date(max_date), days());
 	fprintf(fp, "Generated %s\n", cur_time(time(NULL)));
-	if (yesterday)
-		fprintf(fp, "<br>Yesterday had %lu hits for %.1fM\n",
-			ystats.hits, m(ystats.size));
-	fprintf(fp, "<br>Bots %.0f%%\n", (double)bots * 100.0 / (double)total.hits);
-	fprintf(fp, "</strong></small>\n<hr>\n");
+	if (yesterday) {
+		if (enable_visits)
+			fprintf(fp, "<br>Yesterday had %lu hits, %lu visits, for %.1fM\n",
+				ystats.hits, ystats.visits, m(ystats.size));
+		else
+			fprintf(fp, "<br>Yesterday had %lu hits for %.1fM\n",
+				ystats.hits, m(ystats.size));
+	}
+	if (had_hits == 1) {
+		if (enable_visits)
+			fprintf(fp, "<br>Total %lu hits, %lu visits, for %.1fM\n",
+				total.hits, total.visits, k(total.size));
+		else
+			fprintf(fp, "<br>Total %lu hits for %.1fM\n",
+				total.hits, k(total.size));
+	}
+	if (show_bots)
+		fprintf(fp, "<br>Bots %.0f%%\n", (double)bots * 100.0 / (double)total.hits);
+	fprintf(fp, "</strong></small>\n");
+	if (had_hits != 1)
+		fprintf(fp, "<hr>\n");
 	fprintf(fp, "<center>\n\n");
 }
 
@@ -248,35 +269,14 @@ static void out_html(char *fname, int had_hits)
 		return;
 	}
 
-	out_header(fp);
+	out_header(fp, had_hits);
 
 	if (outgraph)
 		fprintf(fp, "<p><img src=\"%s\" width=%d height=235 "
 			"alt=\"Pie Charts\">\n\n",
 			outgraph, width);
 
-	if (had_hits == 1) {
-		fprintf(fp, "<p><table BORDER=1 CELLPADDING=5");
-		fprintf(fp, " summary=\"Satistics.\">\n");
-
-		if (yesterday) {
-			fputs("<tr><th width=\"33%\"><th width=\"33%\">Total<th width=\"33%\">Yesterday\n", fp);
-			fprintf(fp, "<tr><th>Hits<td align=right>%ld<td align=right>%ld",
-				total.hits, ystats.hits);
-			if (enable_visits)
-				fprintf(fp, "<tr><th>Visits<td align=right>%ld<td align=right>%ld\n",
-					total.visits, ystats.visits);
-			fprintf(fp, "<tr><th>Size (M)<td align=right>%.1f<td align=right>%.1f\n",
-				(double)total.size / 1024.0,
-				(double)ystats.size / 1024.0 / 1024.0);
-		} else {
-			fprintf(fp, "<tr><th>Hits<td align=right>%ld", total.hits);
-			if (enable_visits)
-				fprintf(fp, "<tr><th>Visits<td align=right>%ld", total.visits);
-			fprintf(fp, "<tr><th>Size (M)<td align=right>%.1f\n", (double)total.size / 1024.0);
-		}
-		fprintf(fp, "</table>\n");
-	} else {
+	if (had_hits > 1) {
 		fprintf(fp, "<p><table WIDTH=\"60%%\" BORDER=1 "
 			"CELLSPACING=1 CELLPADDING=1");
 		fprintf(fp, " summary=\"Satistics.\">\n");
@@ -829,10 +829,13 @@ int main(int argc, char *argv[])
 {
 	int i, had_hits;
 
-	while ((i = getopt(argc, argv, "3d:g:hi:n:o:r:s:vyDI:V")) != EOF)
+	while ((i = getopt(argc, argv, "3bd:g:hi:n:o:r:s:vyDI:V")) != EOF)
 		switch (i) {
 		case '3':
 			draw_3d = 1;
+			break;
+		case 'b':
+			show_bots = 1;
 			break;
 		case 'd':
 			outdir = optarg;
