@@ -45,7 +45,7 @@ static struct site {
 #if 1
 	{ "seanm.ca",	0xff0000, 0x900000, 1 }, /* must be first! */
 	{ "m38a1.ca",	0x8d9e83, 0x7d8e73, 1 },
-	{ "emacs",	0xffa500, 0xcf7500 },
+//	{ "emacs",	0xffa500, 0xcf7500 },
 	{ "rippers.ca",	0x000080, 0x000050, 1 },
 	{ "sam-i-am",   0xffffff, 0x000000 },
 #else
