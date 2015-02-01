@@ -741,7 +741,7 @@ static void update_site(struct site *site, struct log *log)
 			++site->ystats.visits;
 		}
 		if (verbose)
-			printf("%s: %s\n", site->name, log->ip);
+			printf("%02d/%02d %s: %s\n", log->tm->tm_mon + 1, log->tm->tm_mday, site->name, log->ip);
 	}
 }
 
