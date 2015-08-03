@@ -12,6 +12,7 @@ static int enable_daily;
 static int draw_3d;
 static int width = 422;
 static int offset = 35;
+static int center_body;
 
 static char host[32];
 static int default_host;
@@ -138,31 +139,36 @@ static void out_header(FILE *fp, int had_hits)
 	if (yesterday) {
 		if (enable_visits)
 			fprintf(fp, "<br>Yesterday had %lu hits, %lu visits, for %.1fM\n",
-				ystats.hits, ystats.visits, m(ystats.size));
+					ystats.hits, ystats.visits, m(ystats.size));
 		else
 			fprintf(fp, "<br>Yesterday had %lu hits for %.1fM\n",
-				ystats.hits, m(ystats.size));
+					ystats.hits, m(ystats.size));
 	}
 	if (had_hits == 1) {
 		if (enable_visits)
 			fprintf(fp, "<br>Total %lu hits, %lu visits, for %.1fM\n",
-				total.hits, total.visits, k(total.size));
+					total.hits, total.visits, k(total.size));
 		else
 			fprintf(fp, "<br>Total %lu hits for %.1fM\n",
-				total.hits, k(total.size));
+					total.hits, k(total.size));
 	}
 	if (show_bots)
 		fprintf(fp, "<br>Bots %.0f%%\n", (double)bots * 100.0 / (double)total.hits);
 	fprintf(fp, "</strong></small>\n");
-	if (had_hits != 1)
-		fprintf(fp, "<hr>\n");
-	fprintf(fp, "<center>\n\n");
+	if (center_body) {
+		if (had_hits != 1)
+			fprintf(fp, "<hr>\n");
+		fprintf(fp, "<center>\n\n");
+	}
 }
 
 static void out_trailer(FILE *fp)
 {
 	/* trailer */
-	fprintf(fp, "\n</center>\n</body>\n</html>\n");
+	if (center_body)
+		fprintf(fp, "\n</center>\n</body>\n</html>\n");
+	else
+		fprintf(fp, "\n</body>\n</html>\n");
 }
 
 static void add_include(char *fname, FILE *out)
@@ -823,13 +829,16 @@ int main(int argc, char *argv[])
 {
 	int i, had_hits;
 
-	while ((i = getopt(argc, argv, "3bd:g:hi:n:o:r:s:vyDI:V")) != EOF)
+	while ((i = getopt(argc, argv, "3bcd:g:hi:n:o:r:s:vyDI:V")) != EOF)
 		switch (i) {
 		case '3':
 			draw_3d = 1;
 			break;
 		case 'b':
 			show_bots = 1;
+			break;
+		case 'c':
+			center_body = 1;
 			break;
 		case 'd':
 			outdir = optarg;
