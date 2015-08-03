@@ -44,9 +44,7 @@ static struct site {
 } sites[] = {
 #if 1
 	{ "seanm.ca",	0xff0000, 0x900000, 1 }, /* must be first! */
-	{ "m38a1.ca",	0x8d9e83, 0x7d8e73, 1 },
-//	{ "emacs",	0xffa500, 0xcf7500 },
-	{ "rippers.ca",	0x000080, 0x000050, 1 },
+//	{ "rippers.ca",	0x000080, 0x000050, 1 },
 	{ "sam-i-am",   0xffffff, 0x000000 },
 #else
 	{ "sam-i-am",	0xff0000, 0x900000, 1 }, /* must be first! */
@@ -114,13 +112,20 @@ static void out_header(FILE *fp, int had_hits)
 {
 	/* Header proper */
 	fprintf(fp,
-		"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n"
-		"<html lang=\"en\">\n"
-		"<head>\n"
-		"  <title>Statistics for %s</title>\n"
-		"  <meta http-equiv=\"Content-type\" content=\"text/html;charset=utf-8\">\n"
-		"  <style type=\"text/css\"> <!-- body { margin: 0 10%%; } --> </style>\n"
-		"</head>\n", host);
+			"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">\n"
+			"<html lang=\"en\">\n"
+			"<head>\n"
+			"  <title>Statistics for %s</title>\n"
+			"  <meta http-equiv=\"Content-type\" content=\"text/html;charset=utf-8\">\n"
+			"  <style type=\"text/css\">\n"
+			"    <!--\n"
+			"    body { margin: 0 10%%; }\n"
+			"    table, th, td { border: 1px solid black; border-collapse: collapse; padding: 5 15; }\n"
+			"    td { text-align: right; }\n"
+			"    td.name { text-align: left; }\n"
+			"    -->\n"
+			"  </style>\n"
+			"</head>\n", host);
 
 	/* Body */
 	fprintf(fp, "<body BGCOLOR=\"#C0C0C0\">\n");
@@ -220,44 +225,36 @@ static void add_include(char *fname, FILE *out)
 static inline void out_count(unsigned long count, unsigned long total, FILE *fp)
 {
 	if (count)
-		fprintf(fp, "<td align=right>%lu<td align=right>%.0f%%",
+		fprintf(fp, "<td>%lu<td>%.0f%%",
 			count, (double)count * 100.0 / (double)total);
 	else
-		fprintf(fp, "<td align=right>0<td align=right>0%%");
+		fprintf(fp, "<td>0<td>0%%");
 }
 
 static void add_yesterday(FILE *fp)
 {
 	int i;
 
-	fprintf(fp, "<p><table WIDTH=\"60%%\" BORDER=1 "
-		"CELLSPACING=1 CELLPADDING=1");
-	fprintf(fp, " summary=\"Satistics.\">\n");
-
-	fprintf(fp, "<tr><th colspan=%d>Yesterday", 5 + (enable_visits * 2));
-	fputs("<tr><th>Site<th colspan=2>Hits", fp);
-	if (enable_visits)
-		fputs("<th colspan=2>Visits", fp);
-	fputs("<th colspan=2>Size (M)\n", fp);
+	fprintf(fp, "<tr><th colspan=%d>Yesterday\n", 5 + (enable_visits * 2));
 
 	for (i = 0; i < n_sites; ++i) {
 		if (sites[i].ystats.hits == 0)
 			continue;
-		fprintf(fp, "<tr><td>%s", sites[i].name);
+		fprintf(fp, "<tr><td class=\"name\">%s", sites[i].name);
 		out_count(sites[i].ystats.hits, ystats.hits, fp);
 		if (enable_visits)
 			out_count(sites[i].ystats.visits, ystats.visits, fp);
-		fprintf(fp, "<td align=right>%.1f<td align=right>%.0f%%\n",
+		fprintf(fp, "<td>%.1f<td>%.0f%%\n",
 			(double)sites[i].ystats.size / 1024.0 / 1024.0,
 			(double)sites[i].ystats.size * 100.0 / (double)ystats.size);
 	}
 
-	fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", ystats.hits);
+	fprintf(fp, "<tr><td>Totals<td>%ld<td>&nbsp;", ystats.hits);
 	if (enable_visits)
-		fprintf(fp, "<td align=right>%ld<td>&nbsp;", ystats.visits);
-	fprintf(fp, "<td align=right>%.1f<td>&nbsp;\n", (double)ystats.size / 1024.0 / 1024.0);
+		fprintf(fp, "<td>%ld<td>&nbsp;", ystats.visits);
+	fprintf(fp, "<td>%.1f<td>&nbsp;\n", (double)ystats.size / 1024.0 / 1024.0);
 
-	fprintf(fp, "</table>\n");
+//	fprintf(fp, "</table>\n");
 }
 
 static void out_html(char *fname, int had_hits)
@@ -277,9 +274,7 @@ static void out_html(char *fname, int had_hits)
 			outgraph, width);
 
 	if (had_hits > 1) {
-		fprintf(fp, "<p><table WIDTH=\"60%%\" BORDER=1 "
-			"CELLSPACING=1 CELLPADDING=1");
-		fprintf(fp, " summary=\"Satistics.\">\n");
+		fprintf(fp, "<p><table summary=\"Satistics.\">\n");
 
 		fputs("<tr><th>Site<th colspan=2>Hits", fp);
 		if (enable_visits)
@@ -289,29 +284,28 @@ static void out_html(char *fname, int had_hits)
 		for (i = 0; i < n_sites; ++i) {
 			if (sites[i].stats.hits == 0)
 				continue;
-			fprintf(fp, "<tr><td>%s", sites[i].name);
+			fprintf(fp, "<tr><td class=\"name\">%s", sites[i].name);
 			out_count(sites[i].stats.hits, total.hits, fp);
 			if (enable_visits)
 				out_count(sites[i].stats.visits, total.visits, fp);
-			fprintf(fp, "<td align=right>%.1f<td align=right>%.0f%%\n",
+			fprintf(fp, "<td>%.1f<td>%.0f%%\n",
 				(double)sites[i].stats.size / 1024.0,
 				(double)sites[i].stats.size * 100.0 / (double)total.size);
 		}
 
-		fprintf(fp, "<tr><td>Totals<td align=right>%ld<td>&nbsp;", total.hits);
+		fprintf(fp, "<tr><td>Totals<td>%ld<td>&nbsp;", total.hits);
 		if (enable_visits)
-			fprintf(fp, "<td align=right>%ld<td>&nbsp;", total.visits);
-		fprintf(fp, "<td align=right>%.1f<td>&nbsp;\n", (double)total.size / 1024.0);
+			fprintf(fp, "<td>%ld<td>&nbsp;", total.visits);
+		fprintf(fp, "<td>%.1f<td>&nbsp;\n", (double)total.size / 1024.0);
+
+		if (yesterday && had_hits > 1)
+			add_yesterday(fp);
 
 		fprintf(fp, "</table>\n");
 	}
 
 	if (enable_daily)
 		fprintf(fp, "<p><img src=\"daily.gif\" alt=\"Daily Graph\">\n");
-
-
-	if (yesterday && had_hits > 1)
-			add_yesterday(fp);
 
 	while (includes) {
 		add_include(includes->name, fp);
