@@ -835,6 +835,18 @@ static void set_default_host(void)
 	}
 }
 
+static void send_email(const char *addr)
+{
+	char cmd[256];
+	time_t now = time(NULL);
+	struct tm *tm = localtime(&now);
+
+	snprintf(cmd, sizeof(cmd), "mail -s 'YOW stats for %d/%d/%d' %s < %s/stats.txt",
+			 tm->tm_year + 1900, tm->tm_mon, tm->tm_mday, addr,
+			 outdir ? outdir : ".");
+	system(cmd);
+}
+
 static void usage(char *prog, int rc)
 {
 	char *p = strrchr(prog, '/');
@@ -859,8 +871,9 @@ static void usage(char *prog, int rc)
 int main(int argc, char *argv[])
 {
 	int i, had_hits;
+	char *email = NULL;
 
-	while ((i = getopt(argc, argv, "3bcd:g:hi:n:o:r:s:vyDI:V")) != EOF)
+	while ((i = getopt(argc, argv, "3bcd:e:g:hi:n:o:r:s:vyDI:V")) != EOF)
 		switch (i) {
 		case '3':
 			draw_3d = 1;
@@ -873,6 +886,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'd':
 			outdir = optarg;
+			break;
+		case 'e':
+			email = optarg;
 			break;
 		case 'g':
 			if (strcmp(optarg, "none") == 0)
@@ -990,6 +1006,9 @@ int main(int argc, char *argv[])
 
 	if (enable_daily)
 		db_close(ddb, "daily.db");
+
+	if (email)
+		send_email(email);
 
 	return 0;
 }
