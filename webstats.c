@@ -331,18 +331,23 @@ static void out_hr(FILE *fp)
 	fputs("\n", fp);
 }
 
-static void dump_site(struct site *site, FILE *fp)
+static void dump_site(struct site *site, struct stats *stats, struct stats *totals, FILE *fp)
 {
-	fprintf(fp, "%-20s%6ld  %3.0f%%\t%6ld  %3.0f%%",
-		site->name, site->stats.hits,
-		(double)site->stats.hits * 100.0 / (double)total.hits,
-		site->stats.size / 1024,
-		(double)site->stats.size * 100.0 / (double)total.size);
+	fprintf(fp, "%-20s%6ld  %3.0f%%",
+			site->name, stats->hits,
+			(double)stats->hits * 100.0 / (double)totals->hits);
 	if (enable_visits)
 		fprintf(fp, "\t%6ld  %3.0f%%",
-			site->stats.visits,
-			(double)site->stats.visits * 100.0 / (double)total.visits);
-	fputc('\n', fp);
+				stats->visits,
+				(double)stats->visits * 100.0 / (double)totals->visits);
+	if (totals == &ystats)
+		fprintf(fp, "\t%5.1f  %3.0f%%\n",
+				(double)stats->size / 1024.0 / 1024.0,
+				(double)stats->size * 100.0 / (double)totals->size);
+	else
+		fprintf(fp, "\t%5.1f  %3.0f%%\n",
+				(double)stats->size / 1024.0,
+				(double)stats->size / (double)totals->size);
 }
 
 static void out_txt(char *fname)
@@ -357,25 +362,51 @@ static void out_txt(char *fname)
 	fprintf(fp, "Statistics for %s\n", host);
 	fprintf(fp, "Summary Period: %s", cur_date(min_date));
 	fprintf(fp, " to %s (%d days)\n", cur_date(max_date), days());
-	fprintf(fp, "Generated %s\n\n", cur_time(time(NULL)));
+	fprintf(fp, "Generated %s\n", cur_time(time(NULL)));
+	if (yesterday) {
+		if (enable_visits)
+			fprintf(fp, "Yesterday had %lu hits, %lu visits, for %.1fM\n",
+					ystats.hits, ystats.visits, m(ystats.size));
+		else
+			fprintf(fp, "Yesterday had %lu hits for %.1fM\n",
+					ystats.hits, m(ystats.size));
+	}
+	if (show_bots)
+		fprintf(fp, "Bots %.0f%%\n", (double)bots * 100.0 / (double)total.hits);
+	fputs("\n", fp);
 
-	fputs("Site\t\t\t Hits\t\t     Size", fp);
+	fputs("Site\t\t\t Hits", fp);
 	if (enable_visits)
-		fputs("\t     Visits", fp);
-	fputc('\n', fp);
+		fputs("\t\t     Visits", fp);
+	fputs("\t     Size\n", fp);
 
 	out_hr(fp);
 
 	for (i = 0; i < n_sites; ++i)
 		if (sites[i].stats.hits)
-			dump_site(&sites[i], fp);
+			dump_site(&sites[i], &sites[i].stats, &total, fp);
 
 	out_hr(fp);
-	fprintf(fp, "%-20s%6ld      \t%6ld",
-		"Totals", total.hits, total.size / 1024);
+
+	fprintf(fp, "%-20s%6ld      ", "Totals", total.hits);
 	if (enable_visits)
-		fprintf(fp, "\t\t%6ld", total.visits);
-	fputc('\n', fp);
+		fprintf(fp, "\t%6ld\t", total.visits);
+	fprintf(fp, "\t%5.1f\n", (double)total.size / 1024.0);
+
+	if (yesterday) {
+		fprintf(fp, "\n%38s\n", "Yesterday");
+		out_hr(fp);
+
+		for (i = 0; i < n_sites; ++i)
+			if (sites[i].ystats.hits)
+				dump_site(&sites[i], &sites[i].ystats, &ystats, fp);
+
+		out_hr(fp);
+		fprintf(fp, "%-20s%6ld      ", "Totals", ystats.hits);
+		if (enable_visits)
+			fprintf(fp, "\t%6ld", ystats.visits);
+		fprintf(fp, "\t\t%5.1f\n", (double)ystats.size / 1024.0 / 1024.0);
+	}
 
 	fclose(fp);
 }
