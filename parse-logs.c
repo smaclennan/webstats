@@ -19,7 +19,7 @@ static DB *counts;
 static int total_count;
 
 /* domains */
-static DB *domains;
+static void *domains;
 
 /* pages */
 static int page_type;
@@ -33,6 +33,12 @@ static int total_pages;
 static DB *ddb;
 
 static int bots;
+
+static int print_count(char *key, void *data, int len)
+{
+	printf("%s %lu\n", key, *(unsigned long *)data);
+	return 0;
+}
 
 static void process_log(struct log *log)
 {
@@ -137,7 +143,7 @@ static void setup_sort(void)
 	}
 }
 
-static void sort_pages(char *key, void *data, int len)
+static int sort_pages(char *key, void *data, int len)
 {
 	int i, j;
 	unsigned long size = *(unsigned long *)data;
@@ -152,7 +158,7 @@ static void sort_pages(char *key, void *data, int len)
 			top[i].size = size;
 			if (n_top < max_top)
 				++n_top;
-			return;
+			return 0;
 		}
 
 	if (n_top < max_top) {
@@ -160,15 +166,18 @@ static void sort_pages(char *key, void *data, int len)
 		top[n_top].size = size;
 		++n_top;
 	}
+
+	return 0;
 }
 
 #define m(n)   (((double)(n)) / 1024.0 / 1024.0)
 #define k(n)   (((double)(n)) / 1024.0)
 
-void print_daily(char *key, void *data, int len)
+int print_daily(char *key, void *data, int len)
 {
 	unsigned long size = *(unsigned long *)data;
 	printf("%s %6lu\n", key, (unsigned long)m(size));
+	return 0;
 }
 
 static void usage(char *prog, int rc)
@@ -198,14 +207,14 @@ int main(int argc, char *argv[])
 	while ((i = getopt(argc, argv, "cdhi:p:r:yvD")) != EOF)
 		switch (i) {
 		case 'c':
-			counts = db_open("counts.db");
+			counts = stats_db_open("counts.db");
 			if (!counts) {
 				printf("Unable to open counts db\n");
 				exit(1);
 			}
 			break;
 		case 'd':
-			domains = db_open("domains.db");
+			domains = stats_db_open("domains.db");
 			if (!domains) {
 				printf("Unable to open pages db\n");
 				exit(1);
@@ -214,7 +223,7 @@ int main(int argc, char *argv[])
 		case 'h':
 			usage(argv[0], 0);
 		case 'i':
-			add_ignore(optarg);
+			add_ip_ignore(optarg);
 			break;
 		case 'p':
 			if (*optarg == 'c')
@@ -226,7 +235,7 @@ int main(int argc, char *argv[])
 			max_top = strtol(optarg + 1, NULL, 10);
 			if (max_top == 0) max_top = 10;
 
-			pages = db_open("pages.db");
+			pages = stats_db_open("pages.db");
 			if (!pages) {
 				printf("Unable to open pages db\n");
 				exit(1);
@@ -242,7 +251,7 @@ int main(int argc, char *argv[])
 			++verbose;
 			break;
 		case 'D':
-			ddb = db_open("daily.db");
+			ddb = stats_db_open("daily.db");
 			if (!ddb) {
 				printf("Unable to open daily db\n");
 				exit(1);
@@ -272,13 +281,13 @@ int main(int argc, char *argv[])
 
 	if (ddb) {
 		db_walk(ddb, print_daily);
-		db_close(ddb, "daily.db");
+		stats_db_close(ddb, "daily.db");
 	}
 
 	if (domains) {
 		puts("Domains:");
 		db_walk(domains, print_count);
-		db_close(domains, "domains.db");
+		stats_db_close(domains, "domains.db");
 	}
 
 	if (pages) {
@@ -306,13 +315,13 @@ int main(int argc, char *argv[])
 			printf("Total %ld/%u\n", total, total_pages);
 		}
 
-		db_close(pages, "pages.db");
+		stats_db_close(pages, "pages.db");
 	}
 
 	if (counts) {
 		puts("Counts:");
 		db_walk(counts, print_count);
-		db_close(counts, "counts");
+		stats_db_close(counts, "counts");
 		printf("Total: %d\n", total_count);
 	}
 

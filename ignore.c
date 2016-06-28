@@ -21,7 +21,7 @@ int ignore_ip(char *ip)
 	return 0;
 }
 
-void add_ignore(char *ip)
+void add_ip_ignore(char *ip)
 {
 	static struct ignore *tail;
 	struct ignore *new = calloc(1, sizeof(struct ignore));

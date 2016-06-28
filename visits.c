@@ -34,10 +34,10 @@ int main(int argc, char *argv[])
 			clickthru = 1;
 			break;
 		case 'i':
-			add_ignore(optarg);
+			add_ip_ignore(optarg);
 			break;
 		case 'u':
-			ipdb = db_open("ipdb");
+			ipdb = stats_db_open("ipdb");
 			if (!ipdb) {
 				printf("Unable to open ip db\n");
 				exit(1);
@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
 		}
 
 	if (ipdb)
-		db_close(ipdb, "ipdb");
+		stats_db_close(ipdb, "ipdb");
 
 	return 0;
 }

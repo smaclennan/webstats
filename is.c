@@ -89,10 +89,10 @@ int isvisit(struct log *log, DB *ipdb, int clickthru)
 	if (!ipdb)
 		return 1; /* success */
 
-	if (db_put_data(ipdb, log->ip, &log->time, sizeof(log->time), DB_NOOVERWRITE) == 0)
+	if (db_put(ipdb, log->ip, &log->time, sizeof(log->time), DB_NOOVERWRITE) == 0)
 		return 1; /* success - ip not in db */
 
-	if (db_get_data(ipdb, log->ip, &lasttime, sizeof(lasttime)) != sizeof(lasttime)) {
+	if (db_get(ipdb, log->ip, &lasttime, sizeof(lasttime)) != sizeof(lasttime)) {
 		puts("DB get failed!");
 		return 0;
 	}
@@ -102,7 +102,7 @@ int isvisit(struct log *log, DB *ipdb, int clickthru)
 		return 0;
 
 	/* Update db with new time */
-	db_put_data(ipdb, log->ip, &log->time, sizeof(log->time), 0);
+	db_put(ipdb, log->ip, &log->time, sizeof(log->time), 0);
 
 	return 1;
 }

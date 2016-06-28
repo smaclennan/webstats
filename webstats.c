@@ -593,7 +593,7 @@ static void add_point(int x, int y)
 		points = tail = new;
 }
 
-static void one_daily(char *key, void *data, int len)
+static int one_daily(char *key, void *data, int len)
 {
 	static int expected = 400;
 	static int dx = D_X;
@@ -602,12 +602,12 @@ static void one_daily(char *key, void *data, int len)
 	char *p = strchr(key, '-');
 	if (!p) {
 		printf("Invalid timestr %s\n", key);
-		return;
+		return 0;
 	}
 	yday = strtol(p + 1, NULL, 10);
 
 	if (yday == today)
-		return;
+		return 0;
 
 	while (expected < yday) {
 		++expected;
@@ -624,6 +624,8 @@ static void one_daily(char *key, void *data, int len)
 
 	if (*(unsigned long *)data > max_daily)
 		max_daily = *(unsigned long *)data;
+
+	return 0;
 }
 
 static void out_daily(void)
@@ -899,7 +901,7 @@ int main(int argc, char *argv[])
 		case 'h':
 			usage(argv[0], 0);
 		case 'i':
-			add_ignore(optarg);
+			add_ip_ignore(optarg);
 			break;
 		case 'n':
 			i = strtol(optarg, NULL, 0);
@@ -948,7 +950,7 @@ int main(int argc, char *argv[])
 
 	if (enable_visits)
 		for (i = 0; i < n_sites; ++i) {
-			sites[i].ipdb = db_open(sites[i].name);
+			sites[i].ipdb = stats_db_open(sites[i].name);
 			if (!sites[i].ipdb) {
 				printf("Unable to open ip db\n");
 				exit(1);
@@ -956,7 +958,7 @@ int main(int argc, char *argv[])
 		}
 
 	if (enable_daily) {
-		ddb = db_open("daily.db");
+		ddb = stats_db_open("daily.db");
 		if (!ddb) {
 			printf("Unable to open daily db\n");
 			exit(1);
@@ -973,7 +975,7 @@ int main(int argc, char *argv[])
 
 	if (enable_visits)
 		for (i = 0; i < n_sites; ++i)
-			db_close(sites[i].ipdb, sites[i].name);
+			stats_db_close(sites[i].ipdb, sites[i].name);
 
 	range_fixup();
 
@@ -1005,7 +1007,7 @@ int main(int argc, char *argv[])
 	out_txt(filename(outfile, ".txt"));
 
 	if (enable_daily)
-		db_close(ddb, "daily.db");
+		stats_db_close(ddb, "daily.db");
 
 	if (email)
 		send_email(email);

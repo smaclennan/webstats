@@ -8,10 +8,10 @@
 #include <errno.h>
 #include <time.h>
 #include <ctype.h>
-
 #include <zlib.h>
-
 #include <db.h>
+
+#include <samlib.h>
 
 extern int verbose;
 extern time_t min_date, max_date;
@@ -49,7 +49,7 @@ int in_range(struct log *log);
 void range_fixup(void);
 
 int ignore_ip(char *ip);
-void add_ignore(char *ip);
+void add_ip_ignore(char *ip);
 
 /* helpful is* functions */
 int isbot(char *who);
@@ -60,24 +60,8 @@ int isvisit(struct log *log, DB *ipdb, int clickthru);
 int get_default_host(char *host, int len);
 
 /* Helpful db functions. */
-void print(char *key, void *data, int len);
-void print_count(char *key, void *data, int len);
-DB *db_open(char *fname);
-DB *db_open_flags(char *fname, int flags);
-int db_get_data(DB *db, char *key, void *data, int len);
-int db_put_data(DB *db, char *key, void *data, int len, int flags);
+DB *stats_db_open(char *fname);
+void stats_db_close(DB *db, char *fname);
 int db_update_count(DB *db, char *str, unsigned long i);
-int db_walk(DB *db, void (*func)(char *key, void *data, int len));
-void db_close(DB *db, char *fname);
-
-static inline int db_put(DB *db, char *str)
-{
-	return db_put_data(db, str, NULL, 0, DB_NOOVERWRITE);
-}
-
-static inline int db_get(DB *db, char *str)
-{
-	return db_get_data(db, str, NULL, 0);
-}
 
 #endif
