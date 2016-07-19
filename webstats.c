@@ -875,7 +875,7 @@ int main(int argc, char *argv[])
 	int i, had_hits;
 	char *email = NULL;
 
-	while ((i = getopt(argc, argv, "3bcd:e:g:hi:n:o:r:s:vyDI:V")) != EOF)
+	while ((i = getopt(argc, argv, "3bcd:e:g:hi:n:o:r:s:vyDEI:V")) != EOF)
 		switch (i) {
 		case '3':
 			draw_3d = 1;
@@ -925,6 +925,14 @@ int main(int argc, char *argv[])
 			break;
 		case 'D':
 			enable_daily = 1;
+			break;
+		case 'E':
+			show_bots = 1;
+			enable_daily = 1;
+			enable_visits = 1;
+			width = 642;
+			offset = 150;
+			yesterday = calc_yesterday();
 			break;
 		case 'I':
 			add_list(optarg, &includes);
