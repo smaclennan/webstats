@@ -31,6 +31,7 @@ static int total_pages;
 
 /* daily */
 static DB *ddb;
+static DB *ipdb;
 
 static int bots;
 
@@ -42,6 +43,8 @@ static int print_count(char *key, void *data, int len)
 
 static void process_log(struct log *log)
 {
+	int isabot;
+
 	if (ignore_ip(log->ip))
 		return;
 
@@ -59,8 +62,10 @@ static void process_log(struct log *log)
 		default_size += log->size;
 	}
 
-	if (isbot(log->who))
+	if (isbot(log->who)) {
 		++bots;
+		isabot = 1;
+	}
 
 	if (ddb) {
 		char timestr[16];
@@ -71,6 +76,9 @@ static void process_log(struct log *log)
 
 		db_update_count(ddb, timestr, log->size);
 	}
+
+	if (ipdb && !isabot)
+		db_put(ipdb, log->ip, NULL, 0, 0);
 
 	if (counts) {
 		db_update_count(counts, log->url, 1);
@@ -200,11 +208,17 @@ static void usage(char *prog, int rc)
 	exit(rc);
 }
 
+static int print_ip(char *key, void *data, int len)
+{
+	puts(key);
+	return 0;
+}
+
 int main(int argc, char *argv[])
 {
 	int i, yarg = 0;
 
-	while ((i = getopt(argc, argv, "cdhi:p:r:yvD")) != EOF)
+	while ((i = getopt(argc, argv, "cdhi:p:r:yvDI")) != EOF)
 		switch (i) {
 		case 'c':
 			counts = stats_db_open("counts.db");
@@ -254,6 +268,13 @@ int main(int argc, char *argv[])
 			ddb = stats_db_open("daily.db");
 			if (!ddb) {
 				printf("Unable to open daily db\n");
+				exit(1);
+			}
+			break;
+		case 'I':
+			ipdb = stats_db_open("ips.db");
+			if (!ipdb) {
+				printf("Unable to open ip db\n");
 				exit(1);
 			}
 			break;
@@ -325,6 +346,11 @@ int main(int argc, char *argv[])
 		printf("Total: %d\n", total_count);
 	}
 
+	if (ipdb) {
+		puts("IPs:");
+		db_walk(ipdb, print_ip);
+		stats_db_close(counts, "ips.db");
+	}
 
 	printf("Hits: %d/%d\n", default_hits, total_hits);
 	printf("Size: %.1f/%.1f\n", k(default_size), k(total_size));
