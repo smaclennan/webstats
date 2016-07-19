@@ -557,7 +557,8 @@ static void out_graphs(void)
 	gdImageDestroy(im);
 }
 
-#define ROUND 4000000
+//#define ROUND 4000000
+#define ROUND 1000000
 #define D_X 50
 #define D_XDELTA 15
 #define D_WIDTH (D_X + (32 - 1) * D_XDELTA + 20)
