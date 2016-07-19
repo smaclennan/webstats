@@ -12,11 +12,11 @@ int ignore_ip(char *ip)
 	struct ignore *ignore;
 
 	if (strncmp(ip, "192.168.", 8) == 0)
-		return 1;
+		return 1; /* local */
 
 	for (ignore = ignores; ignore; ignore = ignore->next)
 		if (strcmp(ip, ignore->ip) == 0)
-			return 1;
+			return 2;
 
 	return 0;
 }

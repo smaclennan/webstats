@@ -43,9 +43,10 @@ static int print_count(char *key, void *data, int len)
 
 static void process_log(struct log *log)
 {
-	int isabot;
+	int isabot, ip_ignore;
 
-	if (ignore_ip(log->ip))
+	ip_ignore = ignore_ip(log->ip);
+	if (ip_ignore == 1) /* local ip */
 		return;
 
 	if (!in_range(log))
@@ -56,6 +57,12 @@ static void process_log(struct log *log)
 
 	++total_hits;
 	total_size += log->size;
+
+	/* We want to count the ip as a hit and add the size, but no other
+	 * stats. Basically, this hit "cost" us but wasn't interesting.
+	 */
+	if (ip_ignore)
+		return;
 
 	if (isdefault(log)) {
 		++default_hits;
