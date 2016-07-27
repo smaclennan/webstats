@@ -66,6 +66,7 @@ int ispage(struct log *log)
 	return 0;
 }
 
+/* Returns 0 on not a visit, 1 on new visit, 2 on visit hit */
 int isvisit(struct log *log, DB *ipdb, int clickthru)
 {
 	time_t lasttime;
@@ -99,7 +100,7 @@ int isvisit(struct log *log, DB *ipdb, int clickthru)
 
 	/* Note: time goes forwards through one file, but backwards through the files */
 	if (abs(log->time - lasttime) < VISIT_TIMEOUT)
-		return 0;
+		return 2;
 
 	/* Update db with new time */
 	db_put(ipdb, log->ip, &log->time, sizeof(log->time), 0);

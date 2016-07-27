@@ -17,7 +17,7 @@ static void process_log(struct log *log)
 	if (yesterday && !time_equal(yesterday, log->tm))
 		return;
 
-	if (isvisit(log, ipdb, clickthru))
+	if (isvisit(log, ipdb, clickthru) == 1)
 		fputs(log->line, stdout);
 }
 

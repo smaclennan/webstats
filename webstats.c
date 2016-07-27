@@ -26,6 +26,7 @@ struct stats {
 	unsigned long hits;
 	unsigned long size;
 	unsigned long visits;
+	unsigned long visit_hits;
 };
 
 static struct tm *yesterday;
@@ -138,16 +139,16 @@ static void out_header(FILE *fp, int had_hits)
 	fprintf(fp, "Generated %s\n", cur_time(time(NULL)));
 	if (yesterday) {
 		if (enable_visits)
-			fprintf(fp, "<br>Yesterday had %lu hits, %lu visits, for %.1fM\n",
-					ystats.hits, ystats.visits, m(ystats.size));
+			fprintf(fp, "<br>Yesterday had %lu hits, %lu visits, %lu visit hits, for %.1fM\n",
+					ystats.hits, ystats.visits, ystats.visit_hits, m(ystats.size));
 		else
 			fprintf(fp, "<br>Yesterday had %lu hits for %.1fM\n",
 					ystats.hits, m(ystats.size));
 	}
 	if (had_hits == 1) {
 		if (enable_visits)
-			fprintf(fp, "<br>Total %lu hits, %lu visits, for %.1fM\n",
-					total.hits, total.visits, k(total.size));
+			fprintf(fp, "<br>Total %lu hits, %lu visits, %lu visit hits, for %.1fM\n",
+					total.hits, total.visits, total.visit_hits, k(total.size));
 		else
 			fprintf(fp, "<br>Total %lu hits for %.1fM\n",
 					total.hits, k(total.size));
@@ -768,15 +769,24 @@ static void update_site(struct site *site, struct log *log)
 		db_update_count(ddb, timestr, log->size);
 	}
 
-	if (enable_visits && isvisit(log, site->ipdb, site->clickthru)) {
-		++site->stats.visits;
-		if (is_yesterday) {
-			++ystats.visits;
-			++site->ystats.visits;
+	if (enable_visits)
+		switch (isvisit(log, site->ipdb, site->clickthru)) {
+		case 1:
+			++site->stats.visits;
+			if (is_yesterday) {
+				++ystats.visits;
+				++site->ystats.visits;
+			}
+			if (verbose)
+				printf("%02d/%02d %s: %s\n", log->tm->tm_mon + 1, log->tm->tm_mday, site->name, log->ip);
+			/* fall thru */
+		case 2:
+			++site->stats.visit_hits;
+			if (is_yesterday) {
+				++ystats.visit_hits;
+				++site->ystats.visit_hits;
+			}
 		}
-		if (verbose)
-			printf("%02d/%02d %s: %s\n", log->tm->tm_mon + 1, log->tm->tm_mday, site->name, log->ip);
-	}
 }
 
 static void process_log(struct log *log)
@@ -992,6 +1002,7 @@ int main(int argc, char *argv[])
 	for (i = 0; i < n_sites; ++i) {
 		total.hits += sites[i].stats.hits;
 		total.visits += sites[i].stats.visits;
+		total.visit_hits += sites[i].stats.visit_hits;
 		sites[i].stats.size /= 1024; /* convert to k */
 		total.size += sites[i].stats.size;
 	}
