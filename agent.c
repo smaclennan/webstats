@@ -37,7 +37,8 @@
 
 
 /* YOW - you probably want to change this */
-#define BASEDIR		"/var/www/seanm.ca/stats"
+//#define BASEDIR		"/var/www/seanm.ca/stats"
+#define BASEDIR		"."
 
 #define OS_STATS_FILE	"os.html"
 #define UNKNOWN_FILE	"unknown.html"
@@ -83,9 +84,9 @@ static int n_os;
 static int max_os;
 
 /* As of 2010 this is about 90 */
-static struct name_count *unknowns;
-static int n_unknown;
-static int max_unknown;
+static struct name_count *unknown_os;
+static int n_unknown_os;
+static int max_unknown_os;
 
 #define WINDOZE		0
 #define UNIX		1
@@ -393,7 +394,7 @@ static void out_html(void)
 	fprintf(fp, "<tr><td class=text>Total Unique Agents<td class=n>%d\n",
 		n_agents);
 	fprintf(fp, "<tr><td class=text>Total Unknown Agents<td class=n>%d\n",
-		n_unknown);
+		n_unknown_os);
 	fprintf(fp, "<tr><td class=text>Total Unique OSes<td class=n>%d\n",
 		n_os);
 	fprintf(fp, "</table>\n");
@@ -593,16 +594,16 @@ static void out_html(void)
 	fprintf(fp, "</head>\n<body bgcolor=\"#e8e8e8\">\n");
 	fprintf(fp, "<center><h1>Unknown agents for YOW</h1>");
 	fprintf(fp, "<p><table BORDER=2 CELLSPACING=1 CELLPADDING=1>\n");
-	for (i = 0; i < n_unknown; ++i) {
-		char *p = unknowns[i].name;
+	for (i = 0; i < n_unknown_os; ++i) {
+		char *p = unknown_os[i].name;
 		while (isspace(*p))
 			++p;
 		if (*p)
 			fprintf(fp, "<tr><td>%s<td align=right>%d\n",
-				unknowns[i].name, unknowns[i].hits);
+				unknown_os[i].name, unknown_os[i].hits);
 		else
 			fprintf(fp, "<tr><td>(empty)<td align=right>%d\n",
-				unknowns[i].hits);
+				unknown_os[i].hits);
 	}
 	fprintf(fp, "</table>\n");
 
@@ -758,18 +759,18 @@ static void add_agent(char *agent, int file, int page)
 
 static void add_unknown(struct name_count *agent)
 {
-	if (n_unknown == max_unknown) {
-		max_unknown += 50;
-		unknowns = realloc(unknowns,
-				   max_unknown * sizeof(struct name_count));
-		if (!unknowns) {
-			printf("Out of memory. Unknowns %d\n", n_unknown);
+	if (n_unknown_os == max_unknown_os) {
+		max_unknown_os += 50;
+		unknown_os = realloc(unknown_os,
+				   max_unknown_os * sizeof(struct name_count));
+		if (!unknown_os) {
+			printf("Out of memory. Unknowns %d\n", n_unknown_os);
 			exit(1);
 		}
 	}
 
-	memcpy(&unknowns[n_unknown], agent, sizeof(struct name_count));
-	++n_unknown;
+	memcpy(&unknown_os[n_unknown_os], agent, sizeof(struct name_count));
+	++n_unknown_os;
 }
 
 static void add_os(int group, char *name, struct name_count *agent)
@@ -988,7 +989,9 @@ again:
 			add_os(WINDOZE, "Windows Other", agent); /* other */
 			printf("windoze unknown: %s\n", line);
 		}
-	} else if ((p = strstr(line, "Mac")) && strncmp(p, "Machine", 7)) {
+	} else if (strstr(line, "Darwin"))
+			add_os(UNIX, "Macintosh", agent);
+	else if ((p = strstr(line, "Mac")) && strncmp(p, "Machine", 7)) {
 		if (strstr(line, "OS X"))
 			add_os(UNIX, "Macintosh", agent);
 		else if (strstr(line, "Darwin"))
@@ -1166,7 +1169,7 @@ static void sort_oses(void)
 		      pages_compare);
 		break;
 	}
-	qsort(unknowns, n_unknown, sizeof(struct name_count), hits_compare);
+	qsort(unknown_os, n_unknown_os, sizeof(struct name_count), hits_compare);
 
 	for (i = 0; i < N_BROWSERS; ++i)
 		if (strncmp(browsers[i].name, "Bot", 3) == 0)
