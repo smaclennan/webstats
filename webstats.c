@@ -45,7 +45,7 @@ static struct site {
 	DB *ipdb;
 } sites[] = {
 #if 1
-	{ "seanm.ca",	0xff0000, 0x900000, 1 }, /* must be first! */
+	{ "seanm.ca",	0xff0000, 0x900000, 0 }, /* must be first! */
 //	{ "rippers.ca",	0x000080, 0x000050, 1 },
 	{ "sam-i-am",   0xffffff, 0x000000 },
 #else
@@ -740,12 +740,20 @@ static void add_list(char *name, struct list **head)
 static void update_site(struct site *site, struct log *log)
 {
 	int is_yesterday = time_equal(yesterday, log->tm);
+	int ip_ignore = ignore_ip(log->ip);
+
+	if (ip_ignore == 1)
+		return; /* local ignore */
+
 
 	if (one_site && strcmp(site->name, one_site))
 		return;
 
 	++site->stats.hits;
 	site->stats.size += log->size;
+
+	if (ip_ignore)
+		return;
 
 	if (isbot(log))
 		++bots;
@@ -792,9 +800,6 @@ static void update_site(struct site *site, struct log *log)
 static void process_log(struct log *log)
 {
 	int i;
-
-	if (ignore_ip(log->ip))
-		return;
 
 	if (!in_range(log))
 		return;
