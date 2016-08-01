@@ -32,21 +32,33 @@ static void setup_botlist(void)
 	}
 }
 
-int isbot(char *who, char *url)
+/* We are also lumping some attacks into bots */
+int isbot(struct log *log)
 {
 	if (n_bots == -1)
 		setup_botlist();
 
+	/* Bad request: count as bot */
+	if (log->status == 400)
+		return 1;
+
+	if (strcmp(log->method, "POST") == 0)
+		return 1;
+
 	int i;
 	for (i = 0; i < n_bots; ++i)
-		if (strcasestr(who, botlist[i])) {
+		if (strcasestr(log->who, botlist[i])) {
 			if (verbose > 1)
-				puts(who);
+				puts(log->who);
 			return 1;
 		}
 
 	/* The problem with this is we don't catch the other hits by the bot */
-	if (url && strcmp(url, "/robots.txt") == 0)
+	if (log->url && strcmp(log->url, "/robots.txt") == 0)
+		return 1;
+
+	/* Also count bogus lines as bots */
+	if (strncmp(log->url, "UNKNOWN", 7) == 0)
 		return 1;
 
 	return 0;
@@ -76,12 +88,21 @@ int isdefault(struct log *log)
 	return 0;
 }
 
-int ispage(struct log *log)
+static int valid_status(int status)
+{
+	switch (status) {
+	case 200:
+	case 302:
+	case 304:
+		return 1;
+	default:
+		return 0;
+	}
+}
+
+static int ispage(struct log *log)
 {
 	char *p;
-
-	if (log->status != 200)
-		return 0;
 
 	/* Asking for default page is good */
 	if (isdefault(log))
@@ -95,9 +116,6 @@ int ispage(struct log *log)
 	if (strncmp(p, ".htm", 4) == 0)
 		return 1;
 
-	if (strcmp(p, ".js") == 0)
-		return 1;
-
 	return 0;
 }
 
@@ -106,41 +124,40 @@ int isvisit(struct log *log, DB *ipdb, int clickthru)
 {
 	time_t lasttime;
 
-	if (log->status != 200)
+	if (!valid_status(log->status))
 		return 0;
 
-	if (strcmp(log->method, "GET"))
-		return 0;
-
-	if (!ispage(log))
+	if (strcmp(log->method, "GET") && strcmp(log->method, "HEAD"))
 		return 0;
 
 	/* Must check before setting time */
 	if (clickthru && isdefault(log))
 		return 0;
 
-	if (isbot(log->who, log->url))
+	if (isbot(log))
 		return 0;
 
 	if (!ipdb)
-		return 1; /* success */
+		return ispage(log);
+
+	int rc = 2; /* visit hit */
 
 	if (db_put(ipdb, log->ip, &log->time, sizeof(log->time), DB_NOOVERWRITE) == 0)
-		return 1; /* success - ip not in db */
+		rc = 1; /* new visit */
 
 	if (db_get(ipdb, log->ip, &lasttime, sizeof(lasttime)) != sizeof(lasttime)) {
-		puts("DB get failed!");
+		printf("DB get failed! %s %s\n", log->ip, log->url);
 		return 0;
 	}
 
 	/* Note: time goes forwards through one file, but backwards through the files */
 	if (abs(log->time - lasttime) < VISIT_TIMEOUT)
-		return 2;
+		/* Update db with new time */
+		db_put(ipdb, log->ip, &log->time, sizeof(log->time), 0);
+	else
+		rc = 1; /* new visit */
 
-	/* Update db with new time */
-	db_put(ipdb, log->ip, &log->time, sizeof(log->time), 0);
-
-	return 1;
+	return rc;
 }
 
 int get_default_host(char *host, int len)

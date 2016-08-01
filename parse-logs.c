@@ -9,17 +9,11 @@ static char default_host[40];
 static int total_hits;
 static unsigned total_size;
 
-static int default_hits;
-static unsigned default_size;
-
 static struct tm *yesterday;
 
 /* counts */
 static DB *counts;
 static int total_count;
-
-/* domains */
-static void *domains;
 
 /* pages */
 static int page_type;
@@ -33,7 +27,12 @@ static int total_pages;
 static DB *ddb;
 static DB *ipdb;
 
+static DB *urldb;
+
 static int bots;
+static int visits;
+static int s404;
+static int others;
 
 static int print_count(char *key, void *data, int len)
 {
@@ -43,7 +42,7 @@ static int print_count(char *key, void *data, int len)
 
 static void process_log(struct log *log)
 {
-	int isabot, ip_ignore;
+	int ip_ignore;
 
 	ip_ignore = ignore_ip(log->ip);
 	if (ip_ignore == 1) /* local ip */
@@ -58,22 +57,6 @@ static void process_log(struct log *log)
 	++total_hits;
 	total_size += log->size;
 
-	/* We want to count the ip as a hit and add the size, but no other
-	 * stats. Basically, this hit "cost" us but wasn't interesting.
-	 */
-	if (ip_ignore)
-		return;
-
-	if (isdefault(log)) {
-		++default_hits;
-		default_size += log->size;
-	}
-
-	if (isbot(log->who, log->url)) {
-		++bots;
-		isabot = 1;
-	}
-
 	if (ddb) {
 		char timestr[16];
 
@@ -84,52 +67,29 @@ static void process_log(struct log *log)
 		db_update_long(ddb, timestr, log->size);
 	}
 
-	if (ipdb && !isabot)
-		db_put(ipdb, log->ip, NULL, 0, 0);
+	/* We want to count the ip as a hit and add the size, but no other
+	 * stats. Basically, this hit "cost" us but wasn't interesting.
+	 */
+	if (ip_ignore)
+		return;
 
-	if (counts) {
-		db_inc_long(counts, log->url);
-		++total_count;
+	if (isbot(log)) {
+		++bots;
+		return;
 	}
 
-	if (domains)
-		db_inc_long(domains, log->host);
-
-#if 0
-	if (pages && log->status == 200) { /* only worry about real files */
-		char url[256], *host;
-		char *p = strstr(log->url, "index.htm");
-		if (p)
-			*p = '\0';
-
-		++total_pages;
-
-#if 0
-		/* By directory */
-		p = log->url;
-		if (*p == '/')
-			++p;
-		p = strchr(p, '/');
-		if (p)
-			*p = '\0';
-		else
-			strcpy(log->url, "/");
-#endif
-
-		host = log->host;
-		if (strcmp(host, "-") == 0)
-			host = default_host;
-
-		int len = snprintf(url, sizeof(url), "%s%s", host, log->url);
-		if (len > max_url)
-			max_url = len;
-
-		if (page_type == PAGE_SIZES)
-			db_update_long(pages, url, log->size);
-		else
-			db_inc_long(pages, url);
+	if (log->status == 404) {
+		++s404;
+		return;
 	}
-#endif
+
+	if (isvisit(log, ipdb, 0)) {
+		++visits;
+		return;
+	}
+
+	++others;
+	fputs(log->line, stdout); // SAM DBG
 }
 
 static struct list {
@@ -205,8 +165,7 @@ static void usage(char *prog, int rc)
 
 	printf("usage: %s [-cdhvD] [-p{c|s}[n]] [-r range] [logfile ...]\nwhere:"
 	       "\t-c enable counts\n"
-	       "\t-d enable domains\n"
-	       "\t-h help\n"
+		   "\t-h help\n"
 	       "\t-pc[n] enable top N page counts\n"
 	       "\t-ps[n] enable top N page sizes\n"
 	       "\t-v verbose\n"
@@ -225,9 +184,9 @@ static int print_ip(char *key, void *data, int len)
 
 int main(int argc, char *argv[])
 {
-	int i, yarg = 0;
+	int i, yarg = 0, dump_ips = 0;
 
-	while ((i = getopt(argc, argv, "b:cdhi:p:r:yvDI")) != EOF)
+	while ((i = getopt(argc, argv, "b:chi:p:r:yvDI")) != EOF)
 		switch (i) {
 		case 'b':
 			botfile = optarg;
@@ -236,13 +195,6 @@ int main(int argc, char *argv[])
 			counts = stats_db_open("counts.db");
 			if (!counts) {
 				printf("Unable to open counts db\n");
-				exit(1);
-			}
-			break;
-		case 'd':
-			domains = stats_db_open("domains.db");
-			if (!domains) {
-				printf("Unable to open pages db\n");
 				exit(1);
 			}
 			break;
@@ -284,22 +236,26 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 'I':
-			ipdb = stats_db_open("ips.db");
-			if (!ipdb) {
-				printf("Unable to open ip db\n");
-				exit(1);
-			}
+			dump_ips = 1;
 			break;
 		default:
 			puts("Sorry!");
 			usage(argv[0], 1);
 		}
 
+	ipdb = stats_db_open("ips.db");
+	if (!ipdb) {
+		printf("Unable to open ip db\n");
+		exit(1);
+	}
+
 	if (yarg)
 		yesterday = calc_yesterdays(yarg);
 
 	if (!get_default_host(default_host, sizeof(default_host)))
 		strcpy(default_host, "seanm.ca");
+
+	urldb = stats_db_open("urls.db");
 
 	if (optind == argc)
 		parse_logfile(NULL, process_log);
@@ -315,12 +271,6 @@ int main(int argc, char *argv[])
 	if (ddb) {
 		db_walk(ddb, print_daily);
 		stats_db_close(ddb, "daily.db");
-	}
-
-	if (domains) {
-		puts("Domains:");
-		db_walk(domains, print_count);
-		stats_db_close(domains, "domains.db");
 	}
 
 	if (pages) {
@@ -358,16 +308,25 @@ int main(int argc, char *argv[])
 		printf("Total: %d\n", total_count);
 	}
 
-	if (ipdb) {
+	if (dump_ips) {
 		puts("IPs:");
 		db_walk(ipdb, print_ip);
 		stats_db_close(counts, "ips.db");
 	}
 
-	printf("Hits: %d/%d\n", default_hits, total_hits);
-	printf("Size: %.1f/%.1f\n", k(default_size), k(total_size));
+	db_walk(urldb, print_count);
 
-//	printf("Bots %d/%d %.1f%%\n", bots, total_hits, (double)bots / (double)total_hits * 100.0);
+#define percent(t) ((double)(t) * 100.0 / (double)(total_hits))
+	printf("Hits: %d bots %d (%.0f%%) visits %d (%.0f%%) 404 %d (%.0f%%) others %d (%.0f%%)\n",
+		   total_hits,
+		   bots, percent(bots),
+		   visits, percent(visits),
+		   s404, percent(s404),
+		   others, percent(others));
+	printf("Size: %.1f\n", k(total_size));
+
+	if (bots + visits + s404 + others != total_hits)
+		puts("PROBLEMS\n");
 
 	return 0;
 }

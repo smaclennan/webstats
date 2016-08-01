@@ -747,7 +747,7 @@ static void update_site(struct site *site, struct log *log)
 	++site->stats.hits;
 	site->stats.size += log->size;
 
-	if (isbot(log->who, log->url))
+	if (isbot(log))
 		++bots;
 
 	if (is_yesterday) {

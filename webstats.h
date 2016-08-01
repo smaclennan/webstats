@@ -53,9 +53,8 @@ int ignore_ip(char *ip);
 void add_ip_ignore(char *ip);
 
 /* helpful is* functions */
-int isbot(char *who, char *url);
+int isbot(struct log *log);
 int isbrowser(char *who);
-int ispage(struct log *log);
 int isdefault(struct log *log);
 int isvisit(struct log *log, DB *ipdb, int clickthru);
 int get_default_host(char *host, int len);
