@@ -69,7 +69,7 @@ static void process_log(struct log *log)
 		default_size += log->size;
 	}
 
-	if (isbot(log->who)) {
+	if (isbot(log->who, log->url)) {
 		++bots;
 		isabot = 1;
 	}
@@ -81,20 +81,21 @@ static void process_log(struct log *log)
 			 log->tm->tm_year + 1900, log->tm->tm_mon, log->tm->tm_mday,
 			 log->tm->tm_yday);
 
-		db_update_count(ddb, timestr, log->size);
+		db_update_long(ddb, timestr, log->size);
 	}
 
 	if (ipdb && !isabot)
 		db_put(ipdb, log->ip, NULL, 0, 0);
 
 	if (counts) {
-		db_update_count(counts, log->url, 1);
+		db_inc_long(counts, log->url);
 		++total_count;
 	}
 
 	if (domains)
-		db_update_count(domains, log->host, 1);
+		db_inc_long(domains, log->host);
 
+#if 0
 	if (pages && log->status == 200) { /* only worry about real files */
 		char url[256], *host;
 		char *p = strstr(log->url, "index.htm");
@@ -124,10 +125,11 @@ static void process_log(struct log *log)
 			max_url = len;
 
 		if (page_type == PAGE_SIZES)
-			db_update_count(pages, url, log->size);
+			db_update_long(pages, url, log->size);
 		else
-			db_update_count(pages, url, 1);
+			db_inc_long(pages, url);
 	}
+#endif
 }
 
 static struct list {
@@ -225,8 +227,11 @@ int main(int argc, char *argv[])
 {
 	int i, yarg = 0;
 
-	while ((i = getopt(argc, argv, "cdhi:p:r:yvDI")) != EOF)
+	while ((i = getopt(argc, argv, "b:cdhi:p:r:yvDI")) != EOF)
 		switch (i) {
+		case 'b':
+			botfile = optarg;
+			break;
 		case 'c':
 			counts = stats_db_open("counts.db");
 			if (!counts) {

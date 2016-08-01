@@ -2,6 +2,7 @@
 
 int verbose;
 static int clickthru;
+static int not;
 static char *host;
 static struct tm *yesterday;
 static DB *ipdb;
@@ -17,7 +18,9 @@ static void process_log(struct log *log)
 	if (yesterday && !time_equal(yesterday, log->tm))
 		return;
 
-	if (isvisit(log, ipdb, clickthru) == 1)
+	if (isvisit(log, ipdb, clickthru) == 1 && not == 0)
+		fputs(log->line, stdout);
+	else
 		fputs(log->line, stdout);
 }
 
@@ -25,7 +28,7 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "h:ci:uvy")) != EOF)
+	while ((i = getopt(argc, argv, "h:ci:nuvy")) != EOF)
 		switch (i) {
 		case 'h':
 			host = optarg;
@@ -35,6 +38,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'i':
 			add_ip_ignore(optarg);
+			break;
+		case 'n':
+			++not;
 			break;
 		case 'u':
 			ipdb = stats_db_open("ipdb");

@@ -3,16 +3,51 @@
 
 #define VISIT_TIMEOUT (30 * 60) /* 30 minutes in seconds */
 
-int isbot(char *who)
+char *botfile;
+static char **botlist;
+static int n_bots = -1;
+
+static char *default_bots[] = { "bot", "spider", "crawl", "link", "slurp" };
+
+static int add_bot(char *line, void *data)
 {
-	if (strcasestr(who, "bot") ||
-	    strcasestr(who, "spider") ||
-	    strcasestr(who, "crawl") ||
-	    strcasestr(who, "link")) {
-		if (verbose > 1)
-			puts(who);
+	botlist = realloc(botlist, (n_bots + 1) * sizeof(char *));
+	line = strdup(line);
+	if (!botlist || !line)
 		return 1;
+	botlist[n_bots++] = line;
+	return 0;
+}
+
+static void setup_botlist(void)
+{
+	if (botfile) {
+		n_bots = 0;
+		if (readfile(add_bot, NULL, botfile,
+				RF_IGNORE_EMPTY | RF_IGNORE_COMMENTS))
+			exit(1);
+	} else {
+		n_bots = 5;
+		botlist = default_bots;
 	}
+}
+
+int isbot(char *who, char *url)
+{
+	if (n_bots == -1)
+		setup_botlist();
+
+	int i;
+	for (i = 0; i < n_bots; ++i)
+		if (strcasestr(who, botlist[i])) {
+			if (verbose > 1)
+				puts(who);
+			return 1;
+		}
+
+	/* The problem with this is we don't catch the other hits by the bot */
+	if (url && strcmp(url, "/robots.txt") == 0)
+		return 1;
 
 	return 0;
 }
@@ -84,7 +119,7 @@ int isvisit(struct log *log, DB *ipdb, int clickthru)
 	if (clickthru && isdefault(log))
 		return 0;
 
-	if (isbot(log->who))
+	if (isbot(log->who, log->url))
 		return 0;
 
 	if (!ipdb)

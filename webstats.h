@@ -15,6 +15,7 @@
 
 extern int verbose;
 extern time_t min_date, max_date;
+extern char *botfile;
 
 struct log {
 	int lineno;
@@ -52,7 +53,7 @@ int ignore_ip(char *ip);
 void add_ip_ignore(char *ip);
 
 /* helpful is* functions */
-int isbot(char *who);
+int isbot(char *who, char *url);
 int isbrowser(char *who);
 int ispage(struct log *log);
 int isdefault(struct log *log);
@@ -62,6 +63,5 @@ int get_default_host(char *host, int len);
 /* Helpful db functions. */
 DB *stats_db_open(char *fname);
 void stats_db_close(DB *db, char *fname);
-int db_update_count(DB *db, char *str, unsigned long i);
 
 #endif

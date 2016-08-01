@@ -16,7 +16,7 @@ DB *stats_db_open(char *fname)
 	return (DB *)db;
 }
 
-void stats_db_close(DB *db, char *fname) // SAM FIX
+void stats_db_close(DB *db, char *fname)
 {
 	db_close((void *)db);
 
@@ -26,15 +26,4 @@ void stats_db_close(DB *db, char *fname) // SAM FIX
 		snprintf(dbname, sizeof(dbname), "/dev/shm/%s", fname);
 		unlink(dbname);
 	}
-}
-
-int db_update_count(DB *db, char *str, unsigned long i)
-{
-	unsigned long count;
-	int len = db_get(db, str, &count, sizeof(count));
-
-	if (len > 0)
-		i += count;
-
-	return db_put(db, str, &i, sizeof(i), 0);
 }

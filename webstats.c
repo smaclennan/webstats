@@ -747,7 +747,7 @@ static void update_site(struct site *site, struct log *log)
 	++site->stats.hits;
 	site->stats.size += log->size;
 
-	if (isbot(log->who))
+	if (isbot(log->who, log->url))
 		++bots;
 
 	if (is_yesterday) {
@@ -766,7 +766,7 @@ static void update_site(struct site *site, struct log *log)
 			 log->tm->tm_mon, log->tm->tm_mday,
 			 log->tm->tm_yday);
 
-		db_update_count(ddb, timestr, log->size);
+		db_update_long(ddb, timestr, log->size);
 	}
 
 	if (enable_visits)
