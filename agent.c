@@ -41,7 +41,8 @@
 #define BASEDIR		"."
 
 #define OS_STATS_FILE	"os.html"
-#define UNKNOWN_FILE	"unknown.html"
+#define UNKNOWN_FILE	"unknown-os.html"
+#define UNKNOWN_BROWSERS	"unknown-browsers.html"
 #define ALL_FILE	"all.html"
 
 
@@ -88,6 +89,10 @@ static struct name_count *unknown_os;
 static int n_unknown_os;
 static int max_unknown_os;
 
+static struct name_count *unknown_browsers;
+static int n_unknown_browsers;
+static int max_unknown_browsers;
+
 #define WINDOZE		0
 #define UNIX		1
 #define OTHER		2
@@ -105,7 +110,8 @@ static int n_groups = (sizeof(groups) / sizeof(struct name_count));
 #define OPERA			4
 #define SAFARI			5
 #define CHROME			6
-#define EMPTY			7
+#define JAVA			7
+#define EMPTY			8
 static struct name_count browsers[] = {
 	{ .name = "Everybody Else(tm)" },
 	{ .name = "Internet Explorer" },
@@ -114,6 +120,7 @@ static struct name_count browsers[] = {
 	{ .name = "Opera" },
 	{ .name = "Safari" },
 	{ .name = "Chrome" },
+	{ .name = "Java/Python/Perl" },
 	{ .name = "Empty" },
 };
 #define N_BROWSERS (sizeof(browsers) / sizeof(struct name_count))
@@ -394,9 +401,11 @@ static void out_html(void)
 	fprintf(fp, "<tr><td class=text>Total Unique Agents<td class=n>%d\n",
 		n_agents);
 	fprintf(fp, "<tr><td class=text>Total Unknown Agents<td class=n>%d\n",
-		n_unknown_os);
+		n_unknown_browsers);
 	fprintf(fp, "<tr><td class=text>Total Unique OSes<td class=n>%d\n",
 		n_os);
+	fprintf(fp, "<tr><td class=text>Total Unknown OSes<td class=n>%d\n",
+		n_unknown_os);
 	fprintf(fp, "</table>\n");
 
 	fprintf(fp, "<p><table WIDTH=\"80%%\" BORDER=2 CELLSPACING=1 "
@@ -446,19 +455,34 @@ static void out_html(void)
 			continue;
 		if (browsers[i].hits == 0)
 			continue;
-		fprintf(fp, "<tr><td class=day>%d"
-			"<td class=n>%d<td>%.1f%%"
-			"<td class=n>%d<td>%.1f%%"
-			"<td class=n>%d<td>%.1f%%\n"
-			"<td class=text>%s\n",
-			i + 1,
-			browsers[i].hits,
-			percent_browser_hits(browsers[i].hits),
-			browsers[i].files,
-			percent_browser_files(browsers[i].files),
-			browsers[i].pages,
-			percent_browser_pages(browsers[i].pages),
-			browsers[i].name);
+		if (strcmp(browsers[i].name, "Everybody Else(tm)") == 0)
+			fprintf(fp, "<tr><td class=day>%d"
+					"<td class=n>%d<td>%.1f%%"
+					"<td class=n>%d<td>%.1f%%"
+					"<td class=n>%d<td>%.1f%%\n"
+					"<td class=text><a href=\"unknown-browsers.html\">%s</a>\n",
+					i + 1,
+					browsers[i].hits,
+					percent_browser_hits(browsers[i].hits),
+					browsers[i].files,
+					percent_browser_files(browsers[i].files),
+					browsers[i].pages,
+					percent_browser_pages(browsers[i].pages),
+					browsers[i].name);
+		else
+			fprintf(fp, "<tr><td class=day>%d"
+					"<td class=n>%d<td>%.1f%%"
+					"<td class=n>%d<td>%.1f%%"
+					"<td class=n>%d<td>%.1f%%\n"
+					"<td class=text>%s\n",
+					i + 1,
+					browsers[i].hits,
+					percent_browser_hits(browsers[i].hits),
+					browsers[i].files,
+					percent_browser_files(browsers[i].files),
+					browsers[i].pages,
+					percent_browser_pages(browsers[i].pages),
+					browsers[i].name);
 	}
 	fprintf(fp, "</table>\n");
 
@@ -474,7 +498,7 @@ static void out_html(void)
 	cur_group = 0;
 	for (i = 0, n = 1; i < n_os; ++i, ++n) {
 		while (cur_group < n_groups &&
-		       greater(&groups[cur_group], &os[i])) {
+			   greater(&groups[cur_group], &os[i])) {
 			fprintf(fp, "<tr bgcolor=\"#D0D0E0\"><td class=day>-"
 				"<td class=n>%d<td>%.1f%%",
 				groups[cur_group].hits,
@@ -502,7 +526,7 @@ static void out_html(void)
 			if (strcmp(os[i].name, "Unknown") == 0) {
 				need_unknown = 1;
 				fprintf(fp, "<td class=text><a href="
-					"\"unknown.html\">Unknown</a>\n");
+					"\"unknown-os.html\">Unknown</a>\n");
 			} else
 				fprintf(fp, "<td class=text>%s\n", os[i].name);
 		}
@@ -613,6 +637,40 @@ static void out_html(void)
 	fprintf(fp, "</center></body>\n</html>\n");
 
 	fclose(fp);
+
+	fp = fopen(UNKNOWN_BROWSERS, "w");
+	if (!fp) {
+		perror(UNKNOWN_BROWSERS);
+		exit(1);
+	}
+
+	/* header */
+	fprintf(fp, "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 "
+		"Transitional//EN\">\n");
+	fprintf(fp, "<html>\n<head>");
+	fprintf(fp, "<title>Unknown browsers for YOW</title>");
+	fprintf(fp, "</head>\n<body bgcolor=\"#e8e8e8\">\n");
+	fprintf(fp, "<center><h1>Unknown browsers for YOW</h1>");
+	fprintf(fp, "<p><table BORDER=2 CELLSPACING=1 CELLPADDING=1>\n");
+	for (i = 0; i < n_unknown_browsers; ++i) {
+		char *p = unknown_browsers[i].name;
+		while (isspace(*p))
+			++p;
+		if (*p)
+			fprintf(fp, "<tr><td>%s<td align=right>%d\n",
+				unknown_browsers[i].name, unknown_browsers[i].hits);
+		else
+			fprintf(fp, "<tr><td>(empty)<td align=right>%d\n",
+				unknown_browsers[i].hits);
+	}
+	fprintf(fp, "</table>\n");
+
+	fprintf(fp, "<p><a href=\"os.html\">Back</a>\n");
+
+	/* trailer */
+	fprintf(fp, "</center></body>\n</html>\n");
+
+	fclose(fp);
 }
 
 #ifdef THTTPD
@@ -663,7 +721,7 @@ static void process_file(FILE *fp)
 		if (status < 100 || status > 600) {
 			if (status) /* Too many status 0s to report */
 				printf("Bad status %d line %d\n",
-				       status, nline);
+					   status, nline);
 			continue;
 		}
 
@@ -757,7 +815,7 @@ static void add_agent(char *agent, int file, int page)
 	++n_agents;
 }
 
-static void add_unknown(struct name_count *agent)
+static void add_unknown_os(struct name_count *agent)
 {
 	if (n_unknown_os == max_unknown_os) {
 		max_unknown_os += 50;
@@ -773,6 +831,22 @@ static void add_unknown(struct name_count *agent)
 	++n_unknown_os;
 }
 
+static void add_unknown_browser(struct name_count *agent)
+{
+	if (n_unknown_browsers == max_unknown_browsers) {
+		max_unknown_browsers += 50;
+		unknown_browsers = realloc(unknown_browsers,
+				   max_unknown_browsers * sizeof(struct name_count));
+		if (!unknown_browsers) {
+			printf("Out of memory. Unknowns %d\n", n_unknown_browsers);
+			exit(1);
+		}
+	}
+
+	memcpy(&unknown_browsers[n_unknown_browsers], agent, sizeof(struct name_count));
+	++n_unknown_browsers;
+}
+
 static void add_os(int group, char *name, struct name_count *agent)
 {
 	int i;
@@ -783,7 +857,7 @@ static void add_os(int group, char *name, struct name_count *agent)
 		char *w = name + 8;
 		if (strcmp(w, "ME") == 0 ||
 		    strcmp(w, "95") == 0 ||
-		    strcmp(w, "NT") == 0)
+			strcmp(w, "NT") == 0)
 			name = "Windows Other";
 	}
 
@@ -914,8 +988,14 @@ static int parse_agent(struct name_count *agent)
 			browser = &browsers[NETSCAPE];
 			printf("UNKNOWN MOZILLA %s\n", line);
 		}
-	} else
+	} else if (strstr(line, "Java") ||
+			   strstr(line, "Python") ||
+			   strstr(line, "Perl"))
+		browser = &browsers[JAVA];
+	else {
 		browser = &browsers[OTHER_BROWSER];
+		add_unknown_browser(agent);
+	}
 
 	if (browser) {
 		browser->hits  += agent->hits;
@@ -983,6 +1063,8 @@ again:
 			add_os(WINDOZE, "Windows NT", agent);
 		else if (strncmp(p, "6.0", 3) == 0)
 			add_os(WINDOZE, "Windows Vista", agent);
+		else if (strstr(p, "Phone"))
+			add_os(OTHER, "Mobile", agent);
 		else if ((p = strstr(p, "Win")))
 			goto again;
 		else {
@@ -1046,9 +1128,11 @@ again:
 	else if (strstr(line, "BlackBerry"))
 		add_os(OTHER, "Mobile", agent); /* SAM ? */
 	else if (strstr(line, "Java"))
-		add_os(OTHER, "Java/Perl", agent);
+		add_os(OTHER, "Java/Perl/Python", agent);
 	else if (strstr(line, "libwww-perl"))
-		add_os(OTHER, "Java/Perl", agent);
+		add_os(OTHER, "Java/Perl/Python", agent);
+	else if (strstr(line, "Python"))
+		add_os(OTHER, "Java/Perl/Python", agent);
 	else if (strstr(line, "Nintendo Wii"))
 		add_os(OTHER, "Wii", agent);
 	else if (strstr(line, "WebTV"))
@@ -1091,7 +1175,7 @@ again:
 		add_os(OTHER, "Facebook", agent);
 	else {
 		add_os(OTHER, "Unknown", agent);
-		add_unknown(agent);
+		add_unknown_os(agent);
 		return 0;
 	}
 
@@ -1170,6 +1254,7 @@ static void sort_oses(void)
 		break;
 	}
 	qsort(unknown_os, n_unknown_os, sizeof(struct name_count), hits_compare);
+	qsort(unknown_browsers, n_unknown_browsers, sizeof(struct name_count), hits_compare);
 
 	for (i = 0; i < N_BROWSERS; ++i)
 		if (strncmp(browsers[i].name, "Bot", 3) == 0)
