@@ -89,7 +89,6 @@ static void process_log(struct log *log)
 	}
 
 	++others;
-	fputs(log->line, stdout); // SAM DBG
 }
 
 static struct list {
