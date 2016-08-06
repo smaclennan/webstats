@@ -94,10 +94,12 @@ static int n_unknown_browsers;
 static int max_unknown_browsers;
 
 #define WINDOZE		0
-#define UNIX		1
-#define OTHER		2
+#define APPLE       1
+#define UNIX		2
+#define OTHER		3
 static struct name_count groups[] = {
 	{ .name = "Microsoft" },
+	{ .name = "Apple" },
 	{ .name = "Unix" },
 	{ .name = "Other" },
 };
@@ -120,7 +122,7 @@ static struct name_count browsers[] = {
 	{ .name = "Opera" },
 	{ .name = "Safari" },
 	{ .name = "Chrome" },
-	{ .name = "Java/Python/Perl" },
+	{ .name = "Scripting" },
 	{ .name = "Empty" },
 };
 #define N_BROWSERS (sizeof(browsers) / sizeof(struct name_count))
@@ -128,6 +130,7 @@ static struct name_count browsers[] = {
 /* The bot index *after* sorting */
 static int bot_index;
 static int empty_index;
+static int java_index;
 
 static int totalhits;
 static int totalfiles;
@@ -174,24 +177,27 @@ static double percent_browser_hits(int hits)
 {
 	return (double)hits * 100.0 /
 		(double)(totalhits -
-			 browsers[bot_index].hits -
-			 browsers[empty_index].hits);
+				 browsers[bot_index].hits -
+				 browsers[empty_index].hits -
+				 browsers[java_index].hits);
 }
 
 static double percent_browser_files(int files)
 {
 	return (double)files * 100.0 /
 		(double)(totalfiles -
-			 browsers[bot_index].files -
-			 browsers[empty_index].files);
+				 browsers[bot_index].files -
+				 browsers[empty_index].files -
+				 browsers[java_index].files);
 }
 
 static double percent_browser_pages(int pages)
 {
 	return (double)pages * 100.0 /
 		(double)(totalpages -
-			 browsers[bot_index].pages -
-			 browsers[empty_index].pages);
+				 browsers[bot_index].pages -
+				 browsers[empty_index].pages -
+				 browsers[java_index].pages);
 }
 
 static double percent_os_hits(int hits)
@@ -428,7 +434,19 @@ static void out_html(void)
 		browsers[bot_index].pages,
 		percent_pages(browsers[bot_index].pages),
 		browsers[bot_index].name);
-	fprintf(fp, "<tr><td class=day>1"
+	fprintf(fp, "<tr><td class=day>2"
+		"<td class=n>%d<td>%.0f%%"
+		"<td class=n>%d<td>%.0f%%"
+		"<td class=n>%d<td>%.0f%%\n"
+		"<td class=text>%s\n",
+		browsers[java_index].hits,
+		percent_hits(browsers[java_index].hits),
+		browsers[java_index].files,
+		percent_files(browsers[java_index].files),
+		browsers[java_index].pages,
+		percent_pages(browsers[java_index].pages),
+		browsers[java_index].name);
+	fprintf(fp, "<tr><td class=day>3"
 		"<td class=n>%d<td>%.0f%%"
 		"<td class=n>%d<td>%.0f%%"
 		"<td class=n>%d<td>%.0f%%\n"
@@ -451,7 +469,7 @@ static void out_html(void)
 		"<th class=pages colspan=2>Pages\n"
 		"<th class=name>Browser\n");
 	for (i = 0; i < N_BROWSERS; ++i) {
-		if (i == bot_index || i == empty_index)
+		if (i == bot_index || i == empty_index || i == java_index)
 			continue;
 		if (browsers[i].hits == 0)
 			continue;
@@ -1006,7 +1024,9 @@ static int parse_agent(struct name_count *agent)
 	}
 
 	/* Bots don't count in the OS count */
-	if (browser == &browsers[BOTS] || browser == &browsers[EMPTY])
+	if (browser == &browsers[BOTS] ||
+		browser == &browsers[EMPTY] ||
+		browser == &browsers[JAVA])
 		return 0;
 
 	/* Try to intuit the OS */
@@ -1102,24 +1122,24 @@ again:
 			printf("windoze unknown: %s\n", line);
 		}
 	} else if (strstr(line, "Darwin"))
-			add_os(UNIX, "Macintosh", agent);
+			add_os(APPLE, "Macintosh", agent);
 	else if ((p = strstr(line, "Mac")) && strncmp(p, "Machine", 7)) {
 		if (strstr(line, "OS X"))
-			add_os(UNIX, "Macintosh", agent);
+			add_os(APPLE, "Macintosh", agent);
 		else if (strstr(line, "Darwin"))
-			add_os(UNIX, "Macintosh", agent);
+			add_os(APPLE, "Macintosh", agent);
 		else if (strncmp(p, "Macintosh", 9) == 0 ||
 			 strncmp(p, "Mac_PowerPC", 11) == 0 ||
 			 strncmp(p, "Mac_PPC", 7) == 0)
-			add_os(OTHER, "Macintosh", agent);
+			add_os(APPLE, "Macintosh", agent);
 		else {
-			add_os(OTHER, "Macintosh", agent);
+			add_os(APPLE, "Macintosh", agent);
 			printf("Macintosh unknown: %s\n", line);
 			return 0; /* Put in unknown page */
 		}
 	} else if (strstr(line, "AppleWebKit"))
 		/* Assume Mac OS X */
-		add_os(UNIX, "Macintosh", agent);
+		add_os(APPLE, "Macintosh", agent);
 
 	/* Unix */
 	else if (strstr(line, "Linux"))
@@ -1293,6 +1313,8 @@ static void sort_oses(void)
 			bot_index = i;
 		else if (strncmp(browsers[i].name, "Empty", 5) == 0)
 			empty_index = i;
+		else if (strncmp(browsers[i].name, "Script", 6) == 0)
+			java_index = i;
 
 	/* Drop empty groups */
 	while (n_groups > 0 && groups[n_groups - 1].hits == 0) {
