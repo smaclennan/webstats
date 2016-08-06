@@ -34,6 +34,16 @@ static struct stats ystats;
 
 static struct stats total;
 
+/* Optimized for size on a 32-bit system */
+struct visit {
+	char ip[16];
+	time_t last_visit;
+	int good : 1;
+	int yesterday : 1;
+	int count : 30;
+	struct visit *next;
+};
+
 static struct site {
 	char *name;
 	int color;
@@ -42,14 +52,14 @@ static struct site {
 	unsigned long arc;
 	struct stats stats;
 	struct stats ystats;
-	DB *ipdb;
+	struct visit *visits;
 } sites[] = {
-#if 1
+#if 0
 	{ "seanm.ca",	0xff0000, 0x900000, 0 }, /* must be first! */
 //	{ "rippers.ca",	0x000080, 0x000050, 1 },
 	{ "sam-i-am",   0xffffff, 0x000000 },
 #else
-	{ "sam-i-am",	0xff0000, 0x900000, 1 }, /* must be first! */
+	{ "seanm.ca",	0xff0000, 0x900000, 0 }, /* must be first! */
 #endif
 };
 static int n_sites = sizeof(sites) / sizeof(struct site);
@@ -737,6 +747,62 @@ static void add_list(char *name, struct list **head)
 	*head = l;
 }
 
+static void count_visits(struct site *site)
+{
+	struct visit *v;
+
+	for (v = site->visits; v; v = v->next)
+		if (v->good) {
+			site->stats.visits++;
+			site->stats.visit_hits += v->count;
+
+			if (v->yesterday) {
+				site->ystats.visits++;
+				site->ystats.visit_hits += v->count;
+			}
+		}
+
+	total.visits += site->stats.visits;
+	total.visit_hits += site->stats.visit_hits;
+	ystats.visits += site->ystats.visits;
+	ystats.visit_hits += site->ystats.visit_hits;
+}
+
+static void add_visit(struct site *site, struct log *log, int is_yesterday)
+{
+	struct visit *v;
+
+	for (v = site->visits; v; v = v->next)
+		if (strcmp(v->ip, log->ip) == 0) {
+			if (abs(v->last_visit - log->time) < VISIT_TIMEOUT)
+				/* Add to current visit */
+				goto update_visit;
+			else
+				break; /* new visit */
+		}
+
+	v = calloc(1, sizeof(struct visit));
+	if (!v) {
+		puts("add_visit: Out of memory");
+		exit(1);
+	}
+
+	snprintf(v->ip, sizeof(v->ip), "%s", log->ip);
+
+	/* Newest visits must be at the head */
+	v->next = site->visits;
+	site->visits = v;
+
+update_visit:
+	/* favicon.ico does not count in good status */
+	if (valid_status(log->status) && strcmp(log->url, "/favicon.ico"))
+		v->good = 1;
+	if (is_yesterday)
+		v->yesterday = 1;
+	++v->count;
+	v->last_visit = log->time;
+}
+
 static void update_site(struct site *site, struct log *log)
 {
 	int is_yesterday = time_equal(yesterday, log->tm);
@@ -744,7 +810,6 @@ static void update_site(struct site *site, struct log *log)
 
 	if (ip_ignore == 1)
 		return; /* local ignore */
-
 
 	if (one_site && strcmp(site->name, one_site))
 		return;
@@ -754,9 +819,6 @@ static void update_site(struct site *site, struct log *log)
 
 	if (ip_ignore)
 		return;
-
-	if (isbot(log))
-		++bots;
 
 	if (is_yesterday) {
 		++ystats.hits;
@@ -777,24 +839,20 @@ static void update_site(struct site *site, struct log *log)
 		db_update_long(ddb, timestr, log->size);
 	}
 
-	if (enable_visits)
-		switch (isvisit(log, site->ipdb, site->clickthru)) {
-		case 1:
-			++site->stats.visits;
-			if (is_yesterday) {
-				++ystats.visits;
-				++site->ystats.visits;
-			}
-			if (verbose)
-				printf("%02d/%02d %s: %s\n", log->tm->tm_mon + 1, log->tm->tm_mday, site->name, log->ip);
-			/* fall thru */
-		case 2:
-			++site->stats.visit_hits;
-			if (is_yesterday) {
-				++ystats.visit_hits;
-				++site->ystats.visit_hits;
-			}
-		}
+	if (isbot(log)) {
+		++bots;
+		return;
+	}
+
+	if (enable_visits) {
+		if (strcmp(log->method, "GET") && strcmp(log->method, "HEAD"))
+			return;
+
+		if (site->clickthru && isdefault(log))
+			return;
+
+		add_visit(site, log, is_yesterday);
+	}
 }
 
 static void process_log(struct log *log)
@@ -972,15 +1030,6 @@ int main(int argc, char *argv[])
 
 	set_default_host();
 
-	if (enable_visits)
-		for (i = 0; i < n_sites; ++i) {
-			sites[i].ipdb = stats_db_open(sites[i].name);
-			if (!sites[i].ipdb) {
-				printf("Unable to open ip db\n");
-				exit(1);
-			}
-		}
-
 	if (enable_daily) {
 		ddb = stats_db_open("daily.db");
 		if (!ddb) {
@@ -999,15 +1048,13 @@ int main(int argc, char *argv[])
 
 	if (enable_visits)
 		for (i = 0; i < n_sites; ++i)
-			stats_db_close(sites[i].ipdb, sites[i].name);
+			count_visits(&sites[i]);
 
 	range_fixup();
 
 	/* Calculate the totals */
 	for (i = 0; i < n_sites; ++i) {
 		total.hits += sites[i].stats.hits;
-		total.visits += sites[i].stats.visits;
-		total.visit_hits += sites[i].stats.visit_hits;
 		sites[i].stats.size /= 1024; /* convert to k */
 		total.size += sites[i].stats.size;
 	}

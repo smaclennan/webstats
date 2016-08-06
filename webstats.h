@@ -13,7 +13,7 @@
 
 #include <samlib.h>
 
-#define VISIT_TIMEOUT (30 * 60) /* 30 minutes in seconds */
+#define VISIT_TIMEOUT (10 * 60) /* 10 minutes in seconds */
 
 extern int verbose;
 extern time_t min_date, max_date;
