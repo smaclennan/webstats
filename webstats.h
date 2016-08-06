@@ -52,6 +52,8 @@ void range_fixup(void);
 int ignore_ip(char *ip);
 void add_ip_ignore(char *ip);
 
+const char *urlcache_get(const char *url);
+
 /* helpful is* functions */
 int isbot(struct log *log);
 int isbrowser(char *who);

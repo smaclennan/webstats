@@ -8,7 +8,7 @@ static struct tm *yesterday;
 static DB *ipdb;
 
 struct url {
-	char *url;
+	const char *url;
 	int count;
 	struct url *next;
 };
@@ -36,12 +36,7 @@ static void add_url(struct visit *v, struct log *log)
 		exit(1);
 	}
 
-	u->url = strdup(log->url);
-	if (!u->url) {
-		puts("Out of memory");
-		exit(1);
-	}
-
+	u->url = urlcache_get(log->url);
 	++u->count;
 
 	if (v->urls)
@@ -150,7 +145,7 @@ int main(int argc, char *argv[])
 		for (v = visits; v; v = v->next) {
 			printf("%-16s %d\n", v->ip, v->count);
 			for (u = v->urls; u; u = u->next)
-				printf("    %s %d\n", u->url, u->count);
+				printf("    %-30s %d\n", u->url, u->count);
 		}
 	}
 

@@ -4,7 +4,7 @@ all:	libwebstats.a agent parse-logs webstats visits
 
 agent:	agent.c
 
-libwebstats.a: parse.o time.o is.o statsdb.o ignore.o
+libwebstats.a: parse.o time.o is.o statsdb.o ignore.o urlcache.o
 	@rm -f $@
 	ar cr $@ $+
 
