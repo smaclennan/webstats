@@ -2,10 +2,8 @@
 
 int verbose;
 static int clickthru;
-static int not;
 static char *host;
 static struct tm *yesterday;
-static DB *ipdb;
 
 struct url {
 	const char *url;
@@ -15,10 +13,28 @@ struct url {
 
 static struct visit {
 	char *ip;
+	time_t last_visit;
 	int count;
+	int good;
 	struct url *urls, *utail;
 	struct visit *next;
 } *visits;
+
+/* Returns 0 on not a visit, 1 on new visit, 2 on visit hit */
+int is_visit(struct log *log, int clickthru)
+{
+	if (strcmp(log->method, "GET") && strcmp(log->method, "HEAD"))
+		return 0;
+
+	/* Must check before setting time */
+	if (clickthru && isdefault(log))
+		return 0;
+
+	if (isbot(log))
+		return 0;
+
+	return 1;
+}
 
 static void add_url(struct visit *v, struct log *log)
 {
@@ -49,12 +65,23 @@ static void add_url(struct visit *v, struct log *log)
 static void add_visit(struct log *log)
 {
 	struct visit *v;
+	int good = 0;
+
+	/* favicon.ico does not count in good status */
+	if (valid_status(log->status) && strcmp(log->url, "/favicon.ico"))
+		good = 1;
 
 	for (v = visits; v; v = v->next)
 		if (strcmp(v->ip, log->ip) == 0) {
-			++v->count;
-			add_url(v, log);
-			return;
+			if (abs(v->last_visit - log->time) < VISIT_TIMEOUT) {
+				v->last_visit = log->time;
+				++v->count;
+				if (good)
+					++v->good;
+				add_url(v, log);
+				return;
+			} else
+				break; /* new visit */
 		}
 
 	v = calloc(1, sizeof(struct visit));
@@ -66,6 +93,11 @@ static void add_visit(struct log *log)
 	v->next = visits;
 	visits = v;
 	++v->count;
+	v->last_visit = log->time;
+
+	/* favicon.ico does not count in good status */
+	if (good)
+		++v->good;
 
 	add_url(v, log);
 }
@@ -84,10 +116,7 @@ static void process_log(struct log *log)
 	if (isbot(log))
 		return;
 
-	if (not) {
-		if (!isvisit(log, ipdb, clickthru))
-			fputs(log->line, stdout);
-	} else if (isvisit(log, ipdb, clickthru))
+	if (is_visit(log, clickthru))
 		add_visit(log);
 }
 
@@ -95,7 +124,7 @@ int main(int argc, char *argv[])
 {
 	int i;
 
-	while ((i = getopt(argc, argv, "h:ci:nvy")) != EOF)
+	while ((i = getopt(argc, argv, "h:ci:vy")) != EOF)
 		switch (i) {
 		case 'h':
 			host = optarg;
@@ -105,9 +134,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'i':
 			add_ip_ignore(optarg);
-			break;
-		case 'n':
-			++not;
 			break;
 		case 'y':
 			yesterday = calc_yesterday();
@@ -120,12 +146,6 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 
-	ipdb = stats_db_open("ipdb");
-	if (!ipdb) {
-		printf("Unable to open ip db\n");
-		exit(1);
-	}
-
 	if (optind == argc)
 		parse_logfile(NULL, process_log);
 	else
@@ -135,19 +155,24 @@ int main(int argc, char *argv[])
 			parse_logfile(argv[i], process_log);
 		}
 
-	if (ipdb)
-		stats_db_close(ipdb, "ipdb");
+	struct visit *v;
+	struct url *u;
+	int n_visits = 0;
+	int visit_hits = 0;
+	int s404 = 0;
 
-	if (!not) {
-		struct visit *v;
-		struct url *u;
-
-		for (v = visits; v; v = v->next) {
-			printf("%-16s %d\n", v->ip, v->count);
+	for (v = visits; v; v = v->next) {
+		if (v->good) {
+			printf("%-16s %d %d\n", v->ip, v->count, v->good);
 			for (u = v->urls; u; u = u->next)
 				printf("    %-30s %d\n", u->url, u->count);
-		}
+			++n_visits;
+			visit_hits += v->count;
+		} else
+			s404 += v->count;
 	}
+
+	printf("Visits %d visit hits %d 404 %d\n", n_visits, visit_hits, s404);
 
 	return 0;
 }

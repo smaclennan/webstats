@@ -13,6 +13,8 @@
 
 #include <samlib.h>
 
+#define VISIT_TIMEOUT (30 * 60) /* 30 minutes in seconds */
+
 extern int verbose;
 extern time_t min_date, max_date;
 extern char *botfile;
@@ -60,6 +62,7 @@ int isbrowser(char *who);
 int isdefault(struct log *log);
 int isvisit(struct log *log, DB *ipdb, int clickthru);
 int get_default_host(char *host, int len);
+int valid_status(int status);
 
 /* Helpful db functions. */
 DB *stats_db_open(char *fname);

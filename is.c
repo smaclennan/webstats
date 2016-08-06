@@ -1,8 +1,6 @@
 #define _GNU_SOURCE /* for strcasestr */
 #include "webstats.h"
 
-#define VISIT_TIMEOUT (30 * 60) /* 30 minutes in seconds */
-
 char *botfile;
 static char **botlist;
 static int n_bots = -1;
@@ -88,7 +86,7 @@ int isdefault(struct log *log)
 	return 0;
 }
 
-static int valid_status(int status)
+int valid_status(int status)
 {
 	switch (status) {
 	case 200:
