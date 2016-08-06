@@ -147,7 +147,7 @@ static void badline(char *line, char *p, int n)
 		printf("%s", p);
 }
 
-static void process_file(FILE *fp);
+static void process_file(FILE *fp, char *fname);
 static void add_agent(char *agent, int file, int page);
 static int  parse_agent(struct name_count *agent);
 static void sort_oses(void);
@@ -311,13 +311,13 @@ int main(int argc, char *argv[])
 
 	for (arg = optind; arg < argc; ++arg)
 		if (strcmp(argv[arg], "-") == 0)
-			process_file(stdin);
+			process_file(stdin, "stdin");
 		else {
 			fp = fopen(argv[arg], "r");
 			if (!fp)
 				perror(argv[arg]);
 			else {
-				process_file(fp);
+				process_file(fp, argv[arg]);
 				fclose(fp);
 			}
 		}
@@ -689,7 +689,7 @@ static int check_url(char *url)
 }
 #endif
 
-static void process_file(FILE *fp)
+static void process_file(FILE *fp, char *fname)
 {
 	char line[4096], *p, *e, *url;
 	int status, file, page, nline = 0;
@@ -699,7 +699,7 @@ static void process_file(FILE *fp)
 		p = strchr(line, '[');
 		e = strchr(line, ']');
 		if (!p || !e) {
-			printf("DATE MISSING line %d\n", nline);
+			printf("%s: DATE MISSING line %d\n", fname, nline);
 			printf("\t%s", line);
 			continue;
 		}
@@ -851,6 +851,7 @@ static void add_os(int group, char *name, struct name_count *agent)
 {
 	int i;
 
+#if 0
 	/* Do Windows grouping here */
 	if (strncmp(name, "Windows ", 8) == 0) {
 		/* These are all < 0.5% */
@@ -860,6 +861,7 @@ static void add_os(int group, char *name, struct name_count *agent)
 			strcmp(w, "NT") == 0)
 			name = "Windows Other";
 	}
+#endif
 
 	os_hits  += agent->hits;
 	os_files += agent->files;
@@ -1018,11 +1020,55 @@ again:
 		if (*p == ' ' || *p == '_' || *p == '+')
 			++p;
 
-		if (strncmp(p, "67", 2) == 0)
+		if (strncmp(p, "NT", 2) == 0) {
+			char *e;
+
+			int major = strtol(p + 2, &e, 10);
+			if (p != e && *e == '.' && isdigit(*(e + 1))) {
+				++e;
+				switch (major) {
+				case 10:
+					add_os(WINDOZE, "Windows 10", agent);
+					return 1;
+				case 6:
+					switch (*e) {
+					case '0':
+						add_os(WINDOZE, "Windows Vista", agent);
+						return 1;
+					case '1':
+						add_os(WINDOZE, "Windows 7", agent);
+						return 1;
+					case '2':
+					case '3': /* 8.1 */
+						add_os(WINDOZE, "Windows 8", agent);
+						return 1;
+					}
+					break;
+				case 5:
+					switch (*e) {
+					case '0':
+						add_os(WINDOZE, "Windows 2000", agent);
+						return 1;
+					case '1':
+						add_os(WINDOZE, "Windows XP", agent);
+						return 1;
+					case '2':
+						add_os(WINDOZE, "Windows Server 2003", agent);
+						return 1;
+					}
+					break;
+				case 4:
+					add_os(WINDOZE, "Windows NT", agent);
+					return 1;
+				}
+			}
+			printf("Windows NT unknown %s\n", line);
+			add_os(WINDOZE, "Windows NT", agent);
+			return 1;
+		} else if (strncmp(p, "67", 2) == 0)
 			/* Win67 not necessarily windows */
 			add_os(OTHER, "Other", agent);
 		else if (strncmp(p, "98", 2) == 0) {
-			/* I got this from analog */
 			if (strstr(p, "Win 9x 4.9"))
 				add_os(WINDOZE, "Windows ME", agent);
 			else
@@ -1034,20 +1080,6 @@ again:
 				add_os(WINDOZE, "Windows ME", agent);
 			else
 				add_os(WINDOZE, "Windows Other", agent);
-		} else if (strncmp(p, "NT", 2) == 0) {
-			p += 2;
-			while (*p == ' ')
-				++p;
-			if (strncmp(p, "6.1", 3) == 0)
-				add_os(WINDOZE, "Windows 7", agent);
-			else if (*p == '6')
-				add_os(WINDOZE, "Windows Vista", agent);
-			else if (strncmp(p, "5.1", 3) == 0)
-				add_os(WINDOZE, "Windows XP", agent);
-			else if (*p == '5')
-				add_os(WINDOZE, "Windows 2000", agent);
-			else
-				add_os(WINDOZE, "Windows NT", agent);
 		} else if (strncmp(p, "2000", 4) == 0)
 			add_os(WINDOZE, "Windows 2000", agent);
 		else if (strncmp(p, "3.1", 3) == 0)
@@ -1061,8 +1093,6 @@ again:
 			add_os(WINDOZE, "Windows XP", agent);
 		else if (strncmp(p, "-NT", 3) == 0)
 			add_os(WINDOZE, "Windows NT", agent);
-		else if (strncmp(p, "6.0", 3) == 0)
-			add_os(WINDOZE, "Windows Vista", agent);
 		else if (strstr(p, "Phone"))
 			add_os(OTHER, "Mobile", agent);
 		else if ((p = strstr(p, "Win")))
@@ -1126,6 +1156,8 @@ again:
 	/* Unix */
 
 	else if (strstr(line, "BlackBerry"))
+		add_os(OTHER, "Mobile", agent); /* SAM ? */
+	else if (strstr(line, "Android"))
 		add_os(OTHER, "Mobile", agent); /* SAM ? */
 	else if (strstr(line, "Java"))
 		add_os(OTHER, "Java/Perl/Python", agent);

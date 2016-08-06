@@ -17,10 +17,10 @@ TH { background-color: #C0C0C0; color: black; }
 TH.SMALL  { font-size: small; }
 TH.N	  { font-size: small; text-align: right; }
 
-TH.DAY    { font-size: small; }
-TH.HITS   { font-size: small; background-color: #008040; color: black; }
-TH.FILES  { font-size: small; background-color: #0080FF; color: black; }
-TH.PAGES  { font-size: small; background-color: #00E0FF; color: black; }
+TH.DAY    { font-size: small; width: 4%; }
+TH.HITS   { font-size: small; background-color: #008040; color: black; width: 20%; }
+TH.FILES  { font-size: small; background-color: #0080FF; color: black; width: 20%; }
+TH.PAGES  { font-size: small; background-color: #00E0FF; color: black; width: 20%; }
 TH.VISITS { font-size: small; background-color: #FFFF00; color: black; }
 TH.SITES  { font-size: small; background-color: #FF8000; color: black; }
 TH.KBYTES { font-size: small; background-color: #FF0000; color: black; }
