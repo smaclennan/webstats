@@ -28,6 +28,9 @@
 #include <time.h>
 #include <errno.h>
 
+#include <gd.h>
+#include <gdfontmb.h>
+#include <gdfonts.h>
 
 /*
  * TODO - deal with timezone
@@ -71,6 +74,8 @@ struct name_count {
 	int files;
 	int pages;
 	int group;
+	unsigned long arc; /* for graphs */
+	int color;
 };
 
 
@@ -98,10 +103,10 @@ static int max_unknown_browsers;
 #define UNIX		2
 #define OTHER		3
 static struct name_count groups[] = {
-	{ .name = "Microsoft" },
-	{ .name = "Apple" },
-	{ .name = "Unix" },
-	{ .name = "Other" },
+	{ .name = "Microsoft", .color = 0x0000ff },
+	{ .name = "Apple", .color = 0xff0000 },
+	{ .name = "Unix", .color = 0x008040 },
+	{ .name = "Other", .color = 0xffff00 },
 };
 static int n_groups = (sizeof(groups) / sizeof(struct name_count));
 
@@ -273,6 +278,96 @@ static char *must_strdup(char *str)
 	exit(1);
 }
 
+#ifdef ADD_GRAPHS
+static int getcolor(gdImagePtr im, int color)
+{
+	return gdImageColorAllocate(im,
+					(color >> 16) & 0xff,
+					(color >> 8) & 0xff,
+					color & 0xff);
+}
+
+static void draw_pie(gdImagePtr im, int cx, int cy, int size)
+{
+	int color;
+	int i, s, e;
+
+	s = 0;
+	for (i = 0; i < n_groups; ++i) {
+		if (groups[i].arc == 0)
+			continue;
+
+		color = getcolor(im, groups[i].color);
+
+		e = s + groups[i].arc;
+
+		gdImageFilledArc(im, cx, cy, size, size,
+						 s, e, color, gdArc);
+
+		s = e;
+	}
+}
+
+static void out_graphs(void)
+{
+	FILE *fp;
+	char *fname;
+	int i, tarc, color;
+	int x;
+	int width = 422;
+	int offset = 35;
+
+	gdImagePtr im = gdImageCreate(width, 235);
+	color = gdImageColorAllocate(im, 0xff, 0xff, 0xff); /* background */
+	gdImageColorTransparent(im, color);
+
+	color = gdImageColorAllocate(im, 0, 0, 0); /* text */
+
+	gdImageString(im, gdFontMediumBold, 87, 203,
+			  (unsigned char *)"Microsoft", color);
+	gdImageString(im, gdFontMediumBold, 305, 203,
+			  (unsigned char *)"Apple", color);
+	gdImageString(im, gdFontMediumBold, 522, 203,
+				  (unsigned char *)"Unix", color);
+	gdImageString(im, gdFontMediumBold, 522, 203,
+				  (unsigned char *)"Other", color);
+
+	x = offset;
+	for (i = 0; i < n_groups; ++i)
+		if (groups[i].pages) {
+			color = getcolor(im, groups[i].color);
+			gdImageString(im, gdFontSmall, x, 220,
+					  (unsigned char *)groups[i].name, color);
+			x += 100;
+		}
+
+	for (tarc = 0, i = n_groups - 1; i > 0; --i) {
+		groups[i].arc = groups[i].pages * 360 / totalpages;
+		tarc += groups[i].arc;
+	}
+
+	/* Compensate the first arc */
+	groups[0].arc = 360 - tarc;
+
+	draw_pie(im, 100, 100, 198);
+
+	/* Save to file. */
+	fname = "os.gif";
+	fp = fopen(fname, "wb");
+	if (!fp) {
+		perror(fname);
+		exit(1);
+	}
+	gdImageGif(im, fp);
+	fclose(fp);
+
+	/* Destroy it */
+	gdImageDestroy(im);
+}
+#else
+void out_graphs(void) {}
+#endif
+
 int main(int argc, char *argv[])
 {
 	FILE *fp;
@@ -334,6 +429,8 @@ int main(int argc, char *argv[])
 	sort_oses();
 
 	out_html();
+
+	out_graphs();
 
 	return 0;
 }

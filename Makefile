@@ -3,6 +3,7 @@ CFLAGS = -Wall -g # -O3
 all:	libwebstats.a agent parse-logs webstats visits
 
 agent:	agent.c
+	gcc -O3 -Wall -o $@ $+
 
 libwebstats.a: parse.o time.o is.o statsdb.o ignore.o urlcache.o
 	@rm -f $@
