@@ -39,8 +39,9 @@ struct visit {
 	char ip[16];
 	time_t last_visit;
 	int good : 1;
+	int bot : 1;
 	int yesterday : 1;
-	int count : 30;
+	int count : 29;
 	struct visit *next;
 };
 
@@ -752,7 +753,9 @@ static void count_visits(struct site *site)
 	struct visit *v;
 
 	for (v = site->visits; v; v = v->next)
-		if (v->good) {
+		if (v->bot)
+			bots += v->count;
+		else if (v->good) {
 			site->stats.visits++;
 			site->stats.visit_hits += v->count;
 
@@ -799,6 +802,11 @@ update_visit:
 		v->good = 1;
 	if (is_yesterday)
 		v->yesterday = 1;
+
+	/* If they ask for robots.txt, assume it is a bot. */
+	if (strcmp(log->url, "/robots.txt") == 0)
+		v->bot = 1;
+
 	++v->count;
 	v->last_visit = log->time;
 }

@@ -51,14 +51,6 @@ int isbot(struct log *log)
 			return 1;
 		}
 
-	/* The problem with this is we don't catch the other hits by the bot */
-	if (log->url && strcmp(log->url, "/robots.txt") == 0)
-		return 1;
-
-	/* Also count bogus lines as bots */
-	if (strncmp(log->url, "UNKNOWN", 7) == 0)
-		return 1;
-
 	return 0;
 }
 

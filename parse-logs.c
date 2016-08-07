@@ -33,6 +33,73 @@ static int bots;
 static int s404;
 static int others;
 
+struct url {
+	const char *url;
+	int count;
+	int status;
+	struct url *next;
+};
+
+static struct visit {
+	char ip[16];
+	int bot;
+	int count;
+	int good;
+	struct url *urls, *utail;
+	struct visit *next;
+} *visits;
+
+static void add_visit_url(struct visit *v, struct log *log)
+{
+	struct url *u;
+
+	for (u = v->urls; u; u = u->next)
+		if (strcmp(u->url, log->url) == 0) {
+			++u->count;
+			return;
+		}
+
+	u = calloc(1, sizeof(struct url));
+
+	u->url = urlcache_get(log->url);
+	u->count = 1;
+	u->status = log->status;
+	if (v->urls)
+		v->utail->next = u;
+	else
+		v->urls = u;
+	v->utail = u;
+}
+
+/* This is a different form of visit. It really collects all urls accessed from a given IP */
+static void add_visit(struct log *log)
+{
+	struct visit *v;
+
+	for (v = visits; v; v = v->next)
+		if (strcmp(v->ip, log->ip) == 0)
+			goto update_visit;
+
+	v = calloc(1, sizeof(struct visit));
+	if (!v) {
+		puts("Out of memory!");
+		exit(1);
+	}
+
+	snprintf(v->ip, sizeof(v->ip), "%s", log->ip);
+
+	v->next = visits;
+	visits = v;
+
+update_visit:
+	v->count++;
+	if (valid_status(log->status))
+		++v->good;
+	if (strcmp(log->url, "/robots.txt") == 0)
+		v->bot = 1;
+	add_visit_url(v, log);
+}
+
 static int print_count(char *key, void *data, int len)
 {
 	printf("%s %lu\n", key, *(unsigned long *)data);
@@ -76,6 +143,10 @@ static void process_log(struct log *log)
 		++bots;
 		return;
 	}
+
+	/* ignore favicon.ico completely */
+	if (strcmp(log->url, "/favicon.ico"))
+		add_visit(log);
 
 	if (log->status == 404) {
 		++s404;
@@ -308,6 +379,16 @@ int main(int argc, char *argv[])
 	}
 
 	db_walk(urldb, print_count);
+
+	struct visit *v;
+	struct url *u;
+	for (v = visits; v; v = v->next) {
+		if (!v->bot && v->count != v->good && v->good) {
+			printf("%-20s %d %d\n", v->ip, v->count, v->good);
+			for (u = v->urls; u; u = u->next)
+				printf("  %-30s %d %d\n", u->url, u->status, u->count);
+		}
+	}
 
 #define percent(t) ((double)(t) * 100.0 / (double)(total_hits))
 	printf("Hits: %d bots %d (%.0f%%) 404 %d (%.0f%%) others %d (%.0f%%)\n",

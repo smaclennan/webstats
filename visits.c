@@ -5,6 +5,9 @@ static int clickthru;
 static char *host;
 static struct tm *yesterday;
 
+static int bots;
+static int total_hits;
+
 struct url {
 	const char *url;
 	int count;
@@ -16,6 +19,7 @@ static struct visit {
 	time_t last_visit;
 	int count;
 	int good;
+	int bot;
 	struct url *urls, *utail;
 	struct visit *next;
 } *visits;
@@ -66,10 +70,14 @@ static void add_visit(struct log *log)
 {
 	struct visit *v;
 	int good = 0;
+	int bot = 0;
 
 	/* favicon.ico does not count in good status */
 	if (valid_status(log->status) && strcmp(log->url, "/favicon.ico"))
 		good = 1;
+
+	if (strcmp(log->url, "/robots.txt") == 0)
+		bot = 1;
 
 	for (v = visits; v; v = v->next)
 		if (strcmp(v->ip, log->ip) == 0) {
@@ -78,6 +86,8 @@ static void add_visit(struct log *log)
 				++v->count;
 				if (good)
 					++v->good;
+				if (bot)
+					v->bot = 1;
 				add_url(v, log);
 				return;
 			} else
@@ -98,6 +108,7 @@ static void add_visit(struct log *log)
 	/* favicon.ico does not count in good status */
 	if (good)
 		++v->good;
+	v->bot = bot;
 
 	add_url(v, log);
 }
@@ -113,8 +124,12 @@ static void process_log(struct log *log)
 	if (yesterday && !time_equal(yesterday, log->tm))
 		return;
 
-	if (isbot(log))
+	++total_hits;
+
+	if (isbot(log)) {
+		++bots;
 		return;
+	}
 
 	if (is_visit(log, clickthru))
 		add_visit(log);
@@ -162,7 +177,10 @@ int main(int argc, char *argv[])
 	int s404 = 0;
 
 	for (v = visits; v; v = v->next) {
-		if (v->good) {
+		if (v->bot)
+			bots += v->count;
+		else
+			if (v->good) {
 			printf("%-16s %d %d\n", v->ip, v->count, v->good);
 			for (u = v->urls; u; u = u->next)
 				printf("    %-30s %d\n", u->url, u->count);
@@ -172,7 +190,13 @@ int main(int argc, char *argv[])
 			s404 += v->count;
 	}
 
-	printf("Visits %d visit hits %d 404 %d\n", n_visits, visit_hits, s404);
+#define percent(a) ((double)(a) * 100.0 / (double)total_hits)
+	printf("Visits %d visit hits %d (%.0f%%) 404 %d (%.0f%%) bots %d (%.0f%%)\n",
+		   n_visits, visit_hits, percent(visit_hits), s404, percent(s404),
+		   bots, percent(bots));
+
+	if (total_hits - visit_hits - s404 - bots)
+		puts("Total problems\n");
 
 	return 0;
 }
