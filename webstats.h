@@ -58,9 +58,7 @@ const char *urlcache_get(const char *url);
 
 /* helpful is* functions */
 int isbot(struct log *log);
-int isbrowser(char *who);
 int isdefault(struct log *log);
-int isvisit(struct log *log, DB *ipdb, int clickthru);
 int get_default_host(char *host, int len);
 int valid_status(int status);
 

@@ -30,7 +30,6 @@ static DB *ipdb;
 static DB *urldb;
 
 static int bots;
-static int visits;
 static int s404;
 static int others;
 
@@ -80,11 +79,6 @@ static void process_log(struct log *log)
 
 	if (log->status == 404) {
 		++s404;
-		return;
-	}
-
-	if (isvisit(log, ipdb, 0)) {
-		++visits;
 		return;
 	}
 
@@ -316,15 +310,14 @@ int main(int argc, char *argv[])
 	db_walk(urldb, print_count);
 
 #define percent(t) ((double)(t) * 100.0 / (double)(total_hits))
-	printf("Hits: %d bots %d (%.0f%%) visits %d (%.0f%%) 404 %d (%.0f%%) others %d (%.0f%%)\n",
+	printf("Hits: %d bots %d (%.0f%%) 404 %d (%.0f%%) others %d (%.0f%%)\n",
 		   total_hits,
 		   bots, percent(bots),
-		   visits, percent(visits),
 		   s404, percent(s404),
 		   others, percent(others));
 	printf("Size: %.1f\n", k(total_size));
 
-	if (bots + visits + s404 + others != total_hits)
+	if (bots + s404 + others != total_hits)
 		puts("PROBLEMS\n");
 
 	return 0;
