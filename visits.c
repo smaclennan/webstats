@@ -7,10 +7,13 @@ static struct tm *yesterday;
 
 static int bots;
 static int total_hits;
+static int unknowns;
+static int others;
 
 struct url {
 	const char *url;
-	int count;
+	int good : 1;
+	int count : 31;
 	struct url *next;
 };
 
@@ -40,7 +43,7 @@ int is_visit(struct log *log, int clickthru)
 	return 1;
 }
 
-static void add_url(struct visit *v, struct log *log)
+static void add_url(struct visit *v, struct log *log, int good)
 {
 	struct url *u;
 
@@ -58,6 +61,8 @@ static void add_url(struct visit *v, struct log *log)
 
 	u->url = urlcache_get(log->url);
 	++u->count;
+	if (good)
+		u->good = 1;
 
 	if (v->urls)
 		v->utail->next = u;
@@ -88,7 +93,7 @@ static void add_visit(struct log *log)
 					++v->good;
 				if (bot)
 					v->bot = 1;
-				add_url(v, log);
+				add_url(v, log, good);
 				return;
 			} else
 				break; /* new visit */
@@ -110,7 +115,7 @@ static void add_visit(struct log *log)
 		++v->good;
 	v->bot = bot;
 
-	add_url(v, log);
+	add_url(v, log, good);
 }
 
 static void process_log(struct log *log)
@@ -131,8 +136,49 @@ static void process_log(struct log *log)
 		return;
 	}
 
-	if (is_visit(log, clickthru))
-		add_visit(log);
+	if (strcmp(log->method, "UNKNOWN") == 0) {
+		if (log->status)
+			++bots;
+		else
+			++unknowns;
+		return;
+	}
+
+	if (strcmp(log->method, "GET") && strcmp(log->method, "HEAD")) {
+		printf("M: %s", log->line); // SAM DBG
+		++others;
+		return;
+	}
+
+	if (clickthru && isdefault(log)) {
+		printf("How to count clickthru defaults?\n");
+		return;
+	}
+
+	add_visit(log);
+}
+
+static void dump_visit(struct visit *v)
+{
+	struct url *u;
+
+	printf("%-16s %d %d\n", v->ip, v->count, v->good);
+	for (u = v->urls; u; u = u->next)
+		printf("    %-30s %d\n", u->url, u->count);
+}
+
+static int is_good_visit(struct visit *v)
+{
+	if (v->good == 0)
+		return 0;
+
+	if (!v->urls)
+		return 0;
+
+	if (v->urls->good == 0)
+		return 0;
+
+	return 1;
 }
 
 int main(int argc, char *argv[])
@@ -171,7 +217,6 @@ int main(int argc, char *argv[])
 		}
 
 	struct visit *v;
-	struct url *u;
 	int n_visits = 0;
 	int visit_hits = 0;
 	int s404 = 0;
@@ -179,11 +224,8 @@ int main(int argc, char *argv[])
 	for (v = visits; v; v = v->next) {
 		if (v->bot)
 			bots += v->count;
-		else
-			if (v->good) {
-			printf("%-16s %d %d\n", v->ip, v->count, v->good);
-			for (u = v->urls; u; u = u->next)
-				printf("    %-30s %d\n", u->url, u->count);
+		else if (is_good_visit(v)) {
+			dump_visit(v);
 			++n_visits;
 			visit_hits += v->count;
 		} else
@@ -191,12 +233,13 @@ int main(int argc, char *argv[])
 	}
 
 #define percent(a) ((double)(a) * 100.0 / (double)total_hits)
-	printf("Visits %d visit hits %d (%.0f%%) 404 %d (%.0f%%) bots %d (%.0f%%)\n",
+	printf("Visits %d visit hits %d (%.0f%%)\n  404 %d (%.0f%%) bots %d (%.0f%%)\n"
+		   "  unknown %d (%.0f%%) others %d (%.0f%%)\n",
 		   n_visits, visit_hits, percent(visit_hits), s404, percent(s404),
-		   bots, percent(bots));
+		   bots, percent(bots), unknowns, percent(unknowns), others, percent(others));
 
-	if (total_hits - visit_hits - s404 - bots)
-		puts("Total problems\n");
+	if (total_hits - visit_hits - s404 - bots - unknowns)
+		printf("Problems: %d != %d\n", total_hits, visit_hits + s404 + bots + unknowns);
 
 	return 0;
 }
