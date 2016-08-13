@@ -27,22 +27,6 @@ static struct visit {
 	struct visit *next;
 } *visits;
 
-/* Returns 0 on not a visit, 1 on new visit, 2 on visit hit */
-int is_visit(struct log *log, int clickthru)
-{
-	if (strcmp(log->method, "GET") && strcmp(log->method, "HEAD"))
-		return 0;
-
-	/* Must check before setting time */
-	if (clickthru && isdefault(log))
-		return 0;
-
-	if (isbot(log))
-		return 0;
-
-	return 1;
-}
-
 static void add_url(struct visit *v, struct log *log, int good)
 {
 	struct url *u;
