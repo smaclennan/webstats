@@ -30,6 +30,7 @@ static DB *ipdb;
 static DB *urldb;
 
 static int bots;
+static int favicons;
 static int s404;
 static int others;
 
@@ -100,10 +101,64 @@ update_visit:
 	add_visit_url(v, log);
 }
 
-static int print_count(char *key, void *data, int len)
+static void dump_visits(int urls)
+{
+	struct visit *v;
+
+	for (v = visits; v; v = v->next) {
+		printf("%-16s count %d good %d bot? %d\n",
+			   v->ip, v->count, v->good, v->bot);
+		if (urls) {
+			struct url *u;
+
+			for (u = v->urls; u; u = u->next)
+				printf("  %s\n", u->url);
+		}
+	}
+}
+
+static int print_count(const char *key, void *data, int len)
 {
 	printf("%s %lu\n", key, *(unsigned long *)data);
 	return 0;
+}
+
+static struct status_list {
+	int status;
+	unsigned count;
+	struct status_list *next;
+} *slist;
+
+static void add_status(int status)
+{
+	struct status_list *sl;
+
+	for (sl = slist; sl; sl = sl->next)
+		if (sl->status == status) {
+			++sl->count;
+			return;
+		}
+
+	sl = calloc(1, sizeof(struct status_list));
+	if (!sl) {
+		puts("Out of memory");
+		exit(1);
+	}
+
+	sl->status = status;
+	sl->count = 1;
+	sl->next = slist;
+	slist = sl;
+}
+
+static void dump_status_list(void)
+{
+	struct status_list *sl;
+
+	for (sl = slist; sl; sl = sl->next)
+		printf("%03d: %6u\n", sl->status, sl->count);
+
+	printf("Favicons %d\n", favicons);
 }
 
 static void process_log(struct log *log)
@@ -139,6 +194,7 @@ static void process_log(struct log *log)
 	if (ip_ignore)
 		return;
 
+#if 0
 	if (isbot(log)) {
 		++bots;
 		return;
@@ -154,6 +210,37 @@ static void process_log(struct log *log)
 	}
 
 	++others;
+#else
+	add_status(log->status);
+
+	if (log->status == 404)
+		/* check for tmUnblock.cgi and hndUnblock.cgi */
+		if (strcasestr(log->url, "Unblock.cgi")) {
+			++bots;
+			return;
+		}
+
+	if (log->status == 400) {
+		++bots;
+		return;
+	}
+
+	if (log->status == 200) {
+		if (strcasestr(log->who, "bot") ||
+			strcasestr(log->who, "spider") ||
+			strcasestr(log->who, "crawl") ||
+			strcasestr(log->who, "blackboard safeassign")) {
+			++bots;
+			return;
+		}
+
+		if (strcmp(log->url, "/favicon.ico") == 0 ||
+			strncmp(log->url, "/apple-touch-icon", 17) == 0)
+			++favicons;
+
+		add_visit(log);
+	}
+#endif
 }
 
 static struct list {
@@ -184,7 +271,7 @@ static void setup_sort(void)
 	}
 }
 
-static int sort_pages(char *key, void *data, int len)
+static int sort_pages(const char *key, void *data, int len)
 {
 	int i, j;
 	unsigned long size = *(unsigned long *)data;
@@ -214,7 +301,7 @@ static int sort_pages(char *key, void *data, int len)
 #define m(n)   (((double)(n)) / 1024.0 / 1024.0)
 #define k(n)   (((double)(n)) / 1024.0)
 
-int print_daily(char *key, void *data, int len)
+int print_daily(const char *key, void *data, int len)
 {
 	unsigned long size = *(unsigned long *)data;
 	printf("%s %6lu\n", key, (unsigned long)m(size));
@@ -240,7 +327,7 @@ static void usage(char *prog, int rc)
 	exit(rc);
 }
 
-static int print_ip(char *key, void *data, int len)
+static int print_ip(const char *key, void *data, int len)
 {
 	puts(key);
 	return 0;
@@ -331,6 +418,9 @@ int main(int argc, char *argv[])
 		}
 
 	range_fixup();
+
+	dump_status_list();
+	dump_visits(1);
 
 	if (ddb) {
 		db_walk(ddb, print_daily);

@@ -1,6 +1,6 @@
 CFLAGS = -Wall -g # -O3
 
-all:	libwebstats.a agent parse-logs webstats visits
+all:	libwebstats.a agent parse-logs webstats visits gigcal
 
 agent:	agent.c
 	gcc -O3 -Wall -o $@ $+
@@ -10,6 +10,9 @@ libwebstats.a: parse.o time.o is.o statsdb.o ignore.o urlcache.o
 	ar cr $@ $+
 
 parse-logs: parse-logs.o libwebstats.a
+	gcc -O3 -Wall -o $@ $+ -ldb -lz -lsamlib
+
+gigcal: gigcal.o libwebstats.a
 	gcc -O3 -Wall -o $@ $+ -ldb -lz -lsamlib
 
 webstats: webstats.o libwebstats.a
