@@ -38,10 +38,10 @@ static struct stats total;
 struct visit {
 	char ip[16];
 	time_t last_visit;
-	int good : 1;
-	int bot : 1;
-	int yesterday : 1;
-	int count : 29;
+	unsigned good : 1;
+	unsigned bot : 1;
+	unsigned yesterday : 1;
+	unsigned count : 29;
 	struct visit *next;
 };
 
@@ -606,7 +606,7 @@ static void add_point(int x, int y)
 		points = tail = new;
 }
 
-static int one_daily(char *key, void *data, int len)
+static int one_daily(const char *key, void *data, int len)
 {
 	static int expected = 400;
 	static int dx = D_X;
@@ -798,8 +798,10 @@ static void add_visit(struct site *site, struct log *log, int is_yesterday)
 
 update_visit:
 	/* favicon.ico does not count in good status */
-	if (valid_status(log->status) && strcmp(log->url, "/favicon.ico"))
+	if (valid_status(log->status) && strcmp(log->url, "/favicon.ico")) {
 		v->good = 1;
+		++v->count;
+	}
 	if (is_yesterday)
 		v->yesterday = 1;
 
@@ -807,7 +809,6 @@ update_visit:
 	if (strcmp(log->url, "/robots.txt") == 0)
 		v->bot = 1;
 
-	++v->count;
 	v->last_visit = log->time;
 }
 
