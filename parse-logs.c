@@ -50,6 +50,11 @@ static struct visit {
 	struct visit *next;
 } *visits;
 
+static int db_update_long(void *dbh, const char *keystr, long update)
+{
+	return db_put_raw(dbh, keystr, strlen(keystr), &update, sizeof(long), 0);
+}
+
 static void add_visit_url(struct visit *v, struct log *log)
 {
 	struct url *u;

@@ -88,6 +88,10 @@ static char *outgraph = "pie.gif";
 #define m(n)   (((double)(n)) / 1024.0 / 1024.0)
 #define k(n)   (((double)(n)) / 1024.0)
 
+static int db_update_long(void *dbh, const char *keystr, long update)
+{
+	return db_put_raw(dbh, keystr, strlen(keystr), &update, sizeof(long), 0);
+}
 
 /* filename mallocs space, you should free it */
 static char *filename(char *fname, char *ext)
