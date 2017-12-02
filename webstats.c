@@ -2,9 +2,11 @@
 
 #include <sys/utsname.h>
 
+#ifdef HAVE_GD
 #include <gd.h>
 #include <gdfontmb.h>
 #include <gdfonts.h>
+#endif
 
 /* Visits takes no more time on YOW. */
 static int enable_visits;
@@ -19,8 +21,6 @@ static int default_host;
 static int show_bots;
 
 static char *one_site;
-
-static int today; /* today as a yday */
 
 struct stats {
 	unsigned long hits;
@@ -70,11 +70,6 @@ struct list {
 	struct list *next;
 };
 
-static struct point {
-	int x, y;
-	struct point *prev, *next;
-} *points;
-
 int verbose;
 
 static struct list *includes;
@@ -87,11 +82,6 @@ static char *outgraph = "pie.gif";
 
 #define m(n)   (((double)(n)) / 1024.0 / 1024.0)
 #define k(n)   (((double)(n)) / 1024.0)
-
-static int db_update_long(void *dbh, const char *keystr, long update)
-{
-	return db_put_raw(dbh, keystr, strlen(keystr), &update, sizeof(long), 0);
-}
 
 /* filename mallocs space, you should free it */
 static char *filename(char *fname, char *ext)
@@ -427,6 +417,19 @@ static void out_txt(char *fname)
 	fclose(fp);
 }
 
+#ifdef HAVE_GD
+static int today; /* today as a yday */
+
+static struct point {
+	int x, y;
+	struct point *prev, *next;
+} *points;
+
+static int db_update_long(void *dbh, const char *keystr, long update)
+{
+	return db_put_raw(dbh, keystr, strlen(keystr), &update, sizeof(long), 0);
+}
+
 static int getcolor(gdImagePtr im, int color)
 {
 	return gdImageColorAllocate(im,
@@ -736,6 +739,14 @@ static void out_daily(void)
 	gdImageDestroy(daily_im);
 }
 
+static void set_today(void)
+{
+	time_t now = time(NULL);
+	struct tm *tm = gmtime(&now);
+	today = tm->tm_yday;
+}
+#endif /* HAVE_GD */
+
 static void add_list(char *name, struct list **head)
 {
 	struct list *l = calloc(1, sizeof(struct list));
@@ -841,6 +852,7 @@ static void update_site(struct site *site, struct log *log)
 		site->ystats.size += log->size;
 	}
 
+#ifdef HAVE_GD
 	if (enable_daily) {
 		char timestr[16];
 
@@ -851,6 +863,7 @@ static void update_site(struct site *site, struct log *log)
 
 		db_update_long(ddb, timestr, log->size);
 	}
+#endif
 
 	if (isbot(log)) {
 		++bots;
@@ -883,13 +896,6 @@ static void process_log(struct log *log)
 
 	/* lighttpd defaults to `default_host' for everything else */
 	update_site(&sites[default_host], log);
-}
-
-static void set_today(void)
-{
-	time_t now = time(NULL);
-	struct tm *tm = gmtime(&now);
-	today = tm->tm_yday;
 }
 
 static void get_hostname(void)
@@ -1043,6 +1049,7 @@ int main(int argc, char *argv[])
 
 	set_default_host();
 
+#ifdef HAVE_GD
 	if (enable_daily) {
 		ddb = stats_db_open("daily.db");
 		if (!ddb) {
@@ -1052,6 +1059,7 @@ int main(int argc, char *argv[])
 
 		set_today();
 	}
+#endif
 
 	for (i = optind; i < argc; ++i) {
 		if (verbose)
@@ -1086,13 +1094,16 @@ int main(int argc, char *argv[])
 	if (had_hits <= 1)
 		outgraph = NULL; /* graph of 100% for one site is boring */
 
+#ifdef HAVE_GD
 	out_graphs();
 	out_daily();
-	out_html(filename(outfile, NULL), had_hits);
-	out_txt(filename(outfile, ".txt"));
 
 	if (enable_daily)
 		stats_db_close(ddb, "daily.db");
+#endif
+
+	out_html(filename(outfile, NULL), had_hits);
+	out_txt(filename(outfile, ".txt"));
 
 	if (email)
 		send_email(email);
