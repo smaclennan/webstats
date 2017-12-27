@@ -140,9 +140,9 @@ static void out_header(FILE *fp, int had_hits)
 	if (had_hits > 1)
 		fprintf(fp, "<small><strong>\n");
 	/* Warning: cur_time/date has a local static for buffer */
-	fprintf(fp, "Summary Period: %s", cur_date(min_date));
-	fprintf(fp, " to %s (%d days)<br>\n", cur_date(max_date), days());
-	fprintf(fp, "Generated %s\n", cur_time(time(NULL)));
+	fprintf(fp, "<p>Summary Period: %s", cur_date(min_date));
+	fprintf(fp, " to %s (%d days)\n", cur_date(max_date), days());
+	fprintf(fp, "<br>Generated %s\n", cur_time(time(NULL)));
 	if (yesterday) {
 		if (enable_visits)
 			fprintf(fp, "<br>Yesterday had %lu hits, %lu visits, %lu visit hits, for %.1fM\n",
