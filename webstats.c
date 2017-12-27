@@ -137,7 +137,8 @@ static void out_header(FILE *fp, int had_hits)
 	/* Body */
 	fprintf(fp, "<body BGCOLOR=\"#C0C0C0\">\n");
 	fprintf(fp, "<h2>Statistics for %s</h2>\n", host);
-	fprintf(fp, "<small><strong>\n");
+	if (had_hits > 1)
+		fprintf(fp, "<small><strong>\n");
 	/* Warning: cur_time/date has a local static for buffer */
 	fprintf(fp, "Summary Period: %s", cur_date(min_date));
 	fprintf(fp, " to %s (%d days)<br>\n", cur_date(max_date), days());
@@ -160,7 +161,8 @@ static void out_header(FILE *fp, int had_hits)
 	}
 	if (show_bots)
 		fprintf(fp, "<br>Bots %.0f%%\n", (double)bots * 100.0 / (double)total.hits);
-	fprintf(fp, "</strong></small>\n");
+	if (had_hits > 1)
+		fprintf(fp, "</strong></small>\n");
 	if (center_body) {
 		if (had_hits != 1)
 			fprintf(fp, "<hr>\n");
