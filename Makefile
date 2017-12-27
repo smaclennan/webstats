@@ -7,7 +7,7 @@ ifneq ($(findstring HAVE_GD,$(CFLAGS)),)
 LIBS += -lgd
 endif
 
-all:	libwebstats.a agent parse-logs webstats visits gigcal
+all:	libwebstats.a agent parse-logs webstats visits
 
 agent:	agent.c
 	gcc -O3 -Wall -o $@ $+

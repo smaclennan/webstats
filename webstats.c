@@ -314,10 +314,10 @@ static void out_html(char *fname, int had_hits)
 			add_yesterday(fp);
 
 		fprintf(fp, "</table>\n");
-	}
 
-	if (enable_daily)
-		fprintf(fp, "<p><img src=\"daily.gif\" alt=\"Daily Graph\">\n");
+		if (enable_daily)
+			fprintf(fp, "<p><img src=\"daily.gif\" alt=\"Daily Graph\">\n");
+	}
 
 	while (includes) {
 		add_include(includes->name, fp);
@@ -1046,6 +1046,10 @@ int main(int argc, char *argv[])
 		puts("I need a logfile to parse!");
 		exit(1);
 	}
+
+#ifndef HAVE_GD
+	enable_daily = 0;
+#endif
 
 	get_hostname();
 
