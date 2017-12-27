@@ -356,7 +356,7 @@ static void dump_site(struct site *site, struct stats *stats, struct stats *tota
 				(double)stats->size / (double)totals->size);
 }
 
-static void out_txt(char *fname)
+static void out_txt(char *fname, int had_hits)
 {
 	int i;
 	FILE *fp = fopen(fname, "w");
@@ -381,37 +381,39 @@ static void out_txt(char *fname)
 		fprintf(fp, "Bots %.0f%%\n", (double)bots * 100.0 / (double)total.hits);
 	fputs("\n", fp);
 
-	fputs("Site\t\t\t Hits", fp);
-	if (enable_visits)
-		fputs("\t\t     Visits", fp);
-	fputs("\t     Size\n", fp);
+	if (had_hits > 1) {
+		fputs("Site\t\t\t Hits", fp);
+		if (enable_visits)
+			fputs("\t\t     Visits", fp);
+		fputs("\t     Size\n", fp);
 
-	out_hr(fp);
-
-	for (i = 0; i < n_sites; ++i)
-		if (sites[i].stats.hits)
-			dump_site(&sites[i], &sites[i].stats, &total, fp);
-
-	out_hr(fp);
-
-	fprintf(fp, "%-20s%6ld      ", "Totals", total.hits);
-	if (enable_visits)
-		fprintf(fp, "\t%6ld\t", total.visits);
-	fprintf(fp, "\t%5.1f\n", (double)total.size / 1024.0);
-
-	if (yesterday) {
-		fprintf(fp, "\n%38s\n", "Yesterday");
 		out_hr(fp);
 
 		for (i = 0; i < n_sites; ++i)
-			if (sites[i].ystats.hits)
-				dump_site(&sites[i], &sites[i].ystats, &ystats, fp);
+			if (sites[i].stats.hits)
+				dump_site(&sites[i], &sites[i].stats, &total, fp);
 
 		out_hr(fp);
-		fprintf(fp, "%-20s%6ld      ", "Totals", ystats.hits);
+
+		fprintf(fp, "%-20s%6ld      ", "Totals", total.hits);
 		if (enable_visits)
-			fprintf(fp, "\t%6ld", ystats.visits);
-		fprintf(fp, "\t\t%5.1f\n", (double)ystats.size / 1024.0 / 1024.0);
+			fprintf(fp, "\t%6ld\t", total.visits);
+		fprintf(fp, "\t%5.1f\n", (double)total.size / 1024.0);
+
+		if (yesterday) {
+			fprintf(fp, "\n%38s\n", "Yesterday");
+			out_hr(fp);
+
+			for (i = 0; i < n_sites; ++i)
+				if (sites[i].ystats.hits)
+					dump_site(&sites[i], &sites[i].ystats, &ystats, fp);
+
+			out_hr(fp);
+			fprintf(fp, "%-20s%6ld      ", "Totals", ystats.hits);
+			if (enable_visits)
+				fprintf(fp, "\t%6ld", ystats.visits);
+			fprintf(fp, "\t\t%5.1f\n", (double)ystats.size / 1024.0 / 1024.0);
+		}
 	}
 
 	fclose(fp);
@@ -1103,7 +1105,7 @@ int main(int argc, char *argv[])
 #endif
 
 	out_html(filename(outfile, NULL), had_hits);
-	out_txt(filename(outfile, ".txt"));
+	out_txt(filename(outfile, ".txt"), had_hits);
 
 	if (email)
 		send_email(email);
