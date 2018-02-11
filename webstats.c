@@ -27,6 +27,7 @@ struct stats {
 	unsigned long size;
 	unsigned long visits;
 	unsigned long visit_hits;
+	unsigned long e404;
 };
 
 static struct tm *yesterday;
@@ -158,8 +159,10 @@ static void out_header(FILE *fp, int had_hits)
 			fprintf(fp, "<br>Total %lu hits for %.1fM\n",
 					total.hits, k(total.size));
 	}
+	fprintf(fp, "<br>");
 	if (show_bots)
-		fprintf(fp, "<br>Bots %.0f%%\n", (double)bots * 100.0 / (double)total.hits);
+		fprintf(fp, "Bots %.0f%%&nbsp;&nbsp;&nbsp;&nbsp;", (double)bots * 100.0 / (double)total.hits);
+	fprintf(fp, "Not found %.0f%%\n", (double)total.e404 * 100.0 / (double)total.hits);
 	if (had_hits > 1)
 		fprintf(fp, "</strong></small>\n");
 	if (center_body) {
@@ -379,7 +382,8 @@ static void out_txt(char *fname, int had_hits)
 					ystats.hits, m(ystats.size));
 	}
 	if (show_bots)
-		fprintf(fp, "Bots %.0f%%\n", (double)bots * 100.0 / (double)total.hits);
+		fprintf(fp, "Bots %.0f%%    ", (double)bots * 100.0 / (double)total.hits);
+	fprintf(fp, "Not found %.0f%%  ", (double)total.e404 * 100.0 / (double)total.hits);
 	fputs("\n", fp);
 
 	if (had_hits > 1) {
@@ -847,6 +851,9 @@ static void update_site(struct site *site, struct log *log)
 	if (ip_ignore)
 		return;
 
+	if (log->status == 404)
+		++site->stats.e404;
+
 	if (is_yesterday) {
 		++ystats.hits;
 		ystats.size += log->size;
@@ -1083,6 +1090,7 @@ int main(int argc, char *argv[])
 	/* Calculate the totals */
 	for (i = 0; i < n_sites; ++i) {
 		total.hits += sites[i].stats.hits;
+		total.e404 += sites[i].stats.e404;
 		sites[i].stats.size /= 1024; /* convert to k */
 		total.size += sites[i].stats.size;
 	}
