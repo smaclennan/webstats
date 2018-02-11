@@ -756,6 +756,8 @@ static void set_today(void)
 
 static void add_list(char *name, struct list **head)
 {
+	static struct list *tail;
+
 	struct list *l = calloc(1, sizeof(struct list));
 	if (!l) {
 		puts("Out of memory");
@@ -766,8 +768,11 @@ static void add_list(char *name, struct list **head)
 		puts("Out of memory");
 		exit(1);
 	}
-	l->next = *head;
-	*head = l;
+	if (*head)
+		tail->next = l;
+	else
+		*head = l;
+	tail = l;
 }
 
 static void count_visits(struct site *site)
