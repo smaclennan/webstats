@@ -61,7 +61,8 @@ int parse_logfile(char *logfile, void (*func)(struct log *log))
 
 	while (my_gets(line, sizeof(line), fp)) {
 		char url[MAXLINE], refer[MAXLINE], who[MAXLINE];
-		char ip[20], host[20], month[8], sstr[20], method[20];
+		/* Method may be large if somebody is trying to hack the url */
+		char ip[20], host[20], month[8], sstr[20], method[MAXLINE];
 		char *s, *e;
 		int n, where;
 		int status;
